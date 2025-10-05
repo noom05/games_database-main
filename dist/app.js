@@ -35,9 +35,9 @@ app.use("/admin", admin_1.router);
 app.use("/uploads", express_1.default.static("uploads"));
 
 // ✅ เสิร์ฟไฟล์ static จาก public
-app.use(express_1.default.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, "public")));
 
 // ✅ เส้นทางสำหรับ test_update
 app.get("/test_update", (req, res) => {
-  res.sendFile(path.join(__dirname, "test_update.html"));
+  res.sendFile(path.join(__dirname, "public", "test_update.html"));
 });
