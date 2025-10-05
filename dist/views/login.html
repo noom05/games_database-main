@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+</head>
+<body>
+  <h2>Login</h2>
+  <form id="loginForm">
+    <input type="email" name="email" placeholder="Email" required /><br />
+    <input type="password" name="password" placeholder="Password" required /><br />
+    <button type="submit">Login</button>
+  </form>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = {
+        email: formData.get("email"),
+        password: formData.get("password")
+      };
+
+      const res = await fetch("/user/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        // เก็บข้อมูลผู้ใช้ไว้ใน localStorage
+        localStorage.setItem("user", JSON.stringify(result));
+        window.location.href = "/dashboard.html";
+      } else {
+        alert(result.message || "Login failed");
+      }
+    });
+  </script>
+</body>
+</html>
