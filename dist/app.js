@@ -10,11 +10,9 @@ const index_1 = require("./controller/index");
 const user_1 = require("./controller/user");
 const admin_1 = require("./controller/admin");
 const body_parser_1 = __importDefault(require("body-parser"));
+const path_1 = __importDefault(require("path"));
 exports.app = (0, express_1.default)();
-
-const path = require("path");
-exports.app.use(express_1.default.static(path.join(__dirname, "public")));
-
+exports.app.use(express_1.default.static(path_1.default.join(__dirname, "public")));
 exports.app.use((0, cors_1.default)({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
