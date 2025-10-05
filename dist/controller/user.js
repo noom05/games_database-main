@@ -128,3 +128,20 @@ exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file")
         res.status(500).json({ error: "Internal Server Error" });
     }
 }));
+exports.router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email, password } = req.body;
+    try {
+        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE email = ?", [email]);
+        const user = rows[0];
+        if (!user)
+            return res.status(401).json({ message: "User not found" });
+        const match = yield bcrypt_1.default.compare(password, user.password);
+        if (!match)
+            return res.status(401).json({ message: "Incorrect password" });
+        res.json({ message: `Welcome ${user.username}`, role: user.role });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+}));
