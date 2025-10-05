@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Update User</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      border-radius: 12px;
+      background: #f8f8f8;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    img {
+      display: block;
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🧑‍💻 Test Update User</h2>
+
+  <label>User ID:</label>
+  <input type="number" id="uid" placeholder="Enter user ID" />
+
+  <label>Username:</label>
+  <input type="text" id="username" placeholder="Enter new username" />
+
+  <label>Email:</label>
+  <input type="email" id="email" placeholder="Enter new email" />
+
+  <label>Password:</label>
+  <input type="password" id="password" placeholder="Enter new password (optional)" />
+
+  <label>Profile Image:</label>
+  <input type="file" id="file" accept="image/*" />
+  <img id="preview" src="" alt="Preview" />
+
+  <button onclick="updateUser()">Update User</button>
+
+  <h3>Response:</h3>
+  <pre id="response"></pre>
+
+  <script>
+    const API_URL = "https://games-database-main.onrender.com/test_update"; // 👈 แก้ให้ตรงกับ backend ของคุณ
+
+    // แสดง preview รูป
+    document.getElementById('file').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById('preview').src = URL.createObjectURL(file);
+      }
+    });
+
+    async function updateUser() {
+      const uid = document.getElementById('uid').value;
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const file = document.getElementById('file').files[0];
+
+      if (!uid) {
+        alert("กรุณาใส่ User ID ก่อน");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("username", username);
+      formData.append("email", email);
+      if (password) formData.append("password", password);
+      if (file) formData.append("file", file);
+
+      try {
+        const res = await fetch(`${API_URL}/${uid}`, {
+          method: "PUT",
+          body: formData
+        });
+
+        const data = await res.json();
+        document.getElementById('response').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('response').textContent = "❌ Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
