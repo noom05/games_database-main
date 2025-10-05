@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Login</title>
 </head>
 <body>
@@ -27,7 +28,14 @@
       });
 
       const result = await res.json();
-      alert(result.message);
+
+      if (res.ok) {
+        // เก็บข้อมูลผู้ใช้ไว้ใน localStorage
+        localStorage.setItem("user", JSON.stringify(result));
+        window.location.href = "/dashboard.html";
+      } else {
+        alert(result.message || "Login failed");
+      }
     });
   </script>
 </body>

@@ -146,3 +146,22 @@ router.put(
     }
   }
 );
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const [rows] = await conn.query("SELECT * FROM users WHERE email = ?", [email]);
+    const user = (rows as Users[])[0];
+
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(401).json({ message: "Incorrect password" });
+
+    res.json({ message: `Welcome ${user.username}`, role: user.role });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
