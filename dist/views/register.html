@@ -4,25 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>สมัครสมาชิก</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light d-flex align-items-center justify-content-center vh-100">
   <div class="card shadow p-4" style="width: 400px;">
     <h4 class="text-center mb-3">สมัครสมาชิก</h4>
     <form id="uploadForm">
       <div class="mb-3">
-        <label class="form-label">ชื่อผู้ใช้</label>
+        <label for="username" class="form-label">ชื่อผู้ใช้</label>
         <input type="text" class="form-control" id="username" name="username" required />
       </div>
       <div class="mb-3">
-        <label class="form-label">อีเมล</label>
+        <label for="email" class="form-label">อีเมล</label>
         <input type="email" class="form-control" id="email" name="email" required />
       </div>
       <div class="mb-3">
-        <label class="form-label">รหัสผ่าน</label>
+        <label for="password" class="form-label">รหัสผ่าน</label>
         <input type="password" class="form-control" id="password" name="password" required />
       </div>
       <div class="mb-3">
-        <label class="form-label">เลือกรูปภาพโปรไฟล์</label>
+        <label for="file" class="form-label">เลือกรูปภาพโปรไฟล์</label>
         <input type="file" class="form-control" id="file" name="file" accept="image/*" />
       </div>
       <button type="submit" class="btn btn-success w-100">สมัครสมาชิก</button>
@@ -31,21 +32,19 @@
     <div id="result" class="text-danger mt-3 text-center" style="white-space: pre-wrap;"></div>
   </div>
 
-  <pre id="result" style="margin-top: 20px; color: red;"></pre>
-
   <script>
     const form = document.getElementById("uploadForm");
     const result = document.getElementById("result");
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      result.textContent = "";
 
       const formData = new FormData();
       formData.append("username", document.getElementById("username").value);
       formData.append("email", document.getElementById("email").value);
       formData.append("password", document.getElementById("password").value);
 
-      // 👇 ต้องใช้ชื่อ field ให้ตรงกับ .single("file") ใน backend
       const fileInput = document.getElementById("file");
       if (fileInput.files.length > 0) {
         formData.append("file", fileInput.files[0]);
@@ -58,13 +57,24 @@
         });
 
         const data = await response.json();
-        result.textContent = JSON.stringify(data, null, 2);
+
+        if (!response.ok) {
+          result.textContent = data.error || "สมัครสมาชิกไม่สำเร็จ";
+          return;
+        }
+
+        result.textContent = "✅ สมัครสมาชิกสำเร็จ!";
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 1500);
       } catch (err) {
         result.textContent = "❌ Error: " + err.message;
       }
     });
 
-    function login(){
+    function login() {
       window.location.href = "login.html";
     }
   </script>
