@@ -13,28 +13,39 @@
   </form>
 
   <script>
-    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const data = {
-        email: formData.get("email"),
-        password: formData.get("password")
-      };
+      msg.textContent = "";
 
-      const res = await fetch("/user/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
 
-      const result = await res.json();
+      try {
+        const res = await fetch("https://games-database-main.onrender.com/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
 
-      if (res.ok) {
-        // เก็บข้อมูลผู้ใช้ไว้ใน localStorage
-        localStorage.setItem("user", JSON.stringify(result));
-        window.location.href = "/dashboard.html";
-      } else {
-        alert(result.message || "Login failed");
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.textContent = data.error || "เข้าสู่ระบบไม่สำเร็จ";
+          return;
+        }
+
+        // ✅ บันทึก token และข้อมูล user ลง localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        // ไปหน้า home
+        window.location.href = "home.html";
+      } catch (err) {
+        console.error(err);
+        msg.textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
       }
     });
   </script>
