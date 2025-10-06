@@ -202,7 +202,7 @@ router.post("/login", async (req, res) => {
 
   try {
     // 1. ตรวจสอบผู้ใช้
-    const [rows] = await conn.query("SELECT * FROM users WHERE email = ?", [
+    const [rows] = await conn.query("SELECT * FROM users WHERE username = ?", [
       username,
     ]);
     if ((rows as any[]).length === 0)
