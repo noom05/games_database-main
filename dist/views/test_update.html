@@ -94,9 +94,31 @@
 
           document.getElementById("username").value = data.username;
           document.getElementById("email").value = data.email;
-          document.getElementById("preview").src = data.profile
-            ? `https://games-database-main.onrender.com/uploads/${data.profile}`
-            : "https://placehold.co/120x120?text=No+Image";
+
+          const preview = document.getElementById("preview");
+
+          if (data.profile) {
+            try {
+              const imageRes = await fetch(
+                `https://games-database-main.onrender.com/uploads/${data.profile}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
+
+              const blob = await imageRes.blob();
+              preview.src = URL.createObjectURL(blob);
+            } catch (imgErr) {
+              console.warn("⚠️ โหลดรูปเก่าไม่สำเร็จ:", imgErr);
+              preview.src = "https://placehold.co/120x120?text=No+Image";
+            }
+          } else {
+            preview.src = "https://placehold.co/120x120?text=No+Image";
+          }
         } catch (err) {
           console.error(err);
           alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
