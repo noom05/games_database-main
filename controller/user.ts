@@ -43,7 +43,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post(
-  "/",
+  "/register",
   fileUpload.diskLoader.single("file"), // multer middleware
   async (req, res) => {
     try {
@@ -51,6 +51,7 @@ router.post(
       const profileFilename = req.file ? req.file.filename : null;
       const hashedPassword = await bcrypt.hash(user.password, 10);
 
+      // 1️⃣ เพิ่มลงฐานข้อมูล
       const sql =
         "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";
       const formattedSql = mysql.format(sql, [

@@ -51,12 +51,13 @@ exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, funct
         res.status(500).json({ error: "Internal Server Error" });
     }
 }));
-exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware
+exports.router.post("/register", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware
 (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const user = req.body;
         const profileFilename = req.file ? req.file.filename : null;
         const hashedPassword = yield bcrypt_1.default.hash(user.password, 10);
+        // 1️⃣ เพิ่มลงฐานข้อมูล
         const sql = "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";
         const formattedSql = mysql2_1.default.format(sql, [
             user.username,
