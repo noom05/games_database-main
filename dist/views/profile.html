@@ -53,7 +53,12 @@
 
   <body>
     <div class="container">
-      <img id="profile-img" class="profile" src="https://via.placeholder.com/120" alt="Profile Picture" />
+      <img
+        id="profile-img"
+        class="profile"
+        src="https://via.placeholder.com/120"
+        alt="Profile Picture"
+      />
       <h2 id="username">กำลังโหลด...</h2>
       <p id="email">...</p>
       <button class="edit-btn" onclick="editProfile()">แก้ไขโปรไฟล์</button>
@@ -71,12 +76,15 @@
 
       async function loadUser() {
         try {
-          const res = await fetch(`https://games-database-main.onrender.com/user/${user.uid}`, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const res = await fetch(
+            `https://games-database-main.onrender.com/user/${user.uid}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
           const data = await res.json();
 
@@ -84,13 +92,36 @@
             throw new Error(data.message || "ไม่สามารถโหลดข้อมูลได้");
           }
 
-          // ตรวจสอบข้อมูลก่อนแสดง
-          document.getElementById("username").textContent = data.username || "ไม่พบชื่อผู้ใช้";
-          document.getElementById("email").textContent = data.email || "ไม่พบอีเมล";
+          document.getElementById("username").textContent =
+            data.username || "ไม่พบชื่อผู้ใช้";
+          document.getElementById("email").textContent =
+            data.email || "ไม่พบอีเมล";
 
           const profileImg = document.getElementById("profile-img");
-          if (data.profile && typeof data.profile === "string" && data.profile.trim() !== "") {
-            profileImg.src = `https://games-database-main.onrender.com/uploads/${data.profile}`;
+
+          if (
+            data.profile &&
+            typeof data.profile === "string" &&
+            data.profile.trim() !== ""
+          ) {
+            try {
+              const imageRes = await fetch(
+                `https://games-database-main.onrender.com/uploads/${data.profile}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
+
+              const blob = await imageRes.blob();
+              profileImg.src = URL.createObjectURL(blob);
+            } catch (imgErr) {
+              console.warn("⚠️ โหลดรูปไม่สำเร็จ:", imgErr);
+              profileImg.src = "https://via.placeholder.com/120";
+            }
           } else {
             profileImg.src = "https://via.placeholder.com/120";
           }
