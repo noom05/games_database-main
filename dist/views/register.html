@@ -22,9 +22,12 @@
     <input type="file" id="file" name="file" accept="image/*" /><br /><br />
 
     <button type="submit">สมัคร</button>
-    <button onclick="login()">เข้าสู่ระบบ</button>
-  </form>
+    <button type="button" onclick="login()">เข้าสู่ระบบ</button>
 
+  </form>
+  
+  <pre id="result" style="margin-top: 20px; color: red;"></pre>
+  
   <script>
     const form = document.getElementById("uploadForm");
     const result = document.getElementById("result");
