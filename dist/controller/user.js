@@ -53,9 +53,10 @@ exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, funct
 }));
 exports.router.post("/register", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware
 (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const user = req.body;
-        const profileFilename = req.file ? req.file.filename : null;
+        const profileFilename = ((_a = req.file) === null || _a === void 0 ? void 0 : _a.filename) || null;
         const hashedPassword = yield bcrypt_1.default.hash(user.password, 10);
         // 1️⃣ เพิ่มลงฐานข้อมูล
         const sql = "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";

@@ -48,7 +48,7 @@ router.post(
   async (req, res) => {
     try {
       const user: Users = req.body;
-      const profileFilename = req.file ? req.file.filename : null;
+      const profileFilename = req.file?.filename || null;
       const hashedPassword = await bcrypt.hash(user.password, 10);
 
       // 1️⃣ เพิ่มลงฐานข้อมูล
