@@ -1,5 +1,5 @@
 import express from "express";
-import { conn } from "../db/dbconnect";
+import { conn } from "../dist/dbconnect";
 import { Users } from "../model/user";
 import mysql from "mysql2";
 import bcrypt from "bcrypt";
@@ -202,7 +202,7 @@ router.post("/login", async (req, res) => {
 
   try {
     // 1. ตรวจสอบผู้ใช้
-    const [rows] = await conn.query("SELECT * FROM users WHERE username = ?", [
+    const [rows] = await conn.query("SELECT * FROM users WHERE email = ?", [
       username,
     ]);
     if ((rows as any[]).length === 0)
@@ -212,6 +212,7 @@ router.post("/login", async (req, res) => {
 
     // 2. ตรวจสอบรหัสผ่าน
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("match:", isMatch);
     if (!isMatch) return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
 
     // 3. สร้าง JWT payload

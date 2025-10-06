@@ -1,40 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <title>Login</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-  <h2>Login</h2>
-  <form id="loginForm">
-    <input type="email" name="email" placeholder="Email" required /><br />
-    <input type="password" name="password" placeholder="Password" required /><br />
-    <button type="submit">Login</button>
-  </form>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+  <div class="card shadow p-4" style="width: 350px;">
+    <h4 class="text-center mb-3">เข้าสู่ระบบ</h4>
+    <form id="loginForm">
+      <div class="mb-3">
+        <label class="form-label">ชื่อผู้ใช้</label>
+        <input type="text" class="form-control" id="username" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">รหัสผ่าน</label>
+        <input type="password" class="form-control" id="password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">เข้าสู่ระบบ</button>
+    </form>
+    <div id="message" class="text-danger mt-3 text-center"></div>
+  </div>
 
   <script>
-    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const data = {
-        email: formData.get("email"),
-        password: formData.get("password")
-      };
+      msg.textContent = "";
 
-      const res = await fetch("/user/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
 
-      const result = await res.json();
+      try {
+        const res = await fetch("https://games-database-main.onrender.com/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
 
-      if (res.ok) {
-        // เก็บข้อมูลผู้ใช้ไว้ใน localStorage
-        localStorage.setItem("user", JSON.stringify(result));
-        window.location.href = "/dashboard.html";
-      } else {
-        alert(result.message || "Login failed");
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.textContent = data.error || "เข้าสู่ระบบไม่สำเร็จ";
+          return;
+        }
+
+        // ✅ บันทึก token และข้อมูล user ลง localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        // ไปหน้า home
+        window.location.href = "home.html";
+      } catch (err) {
+        console.error(err);
+        msg.textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
       }
     });
   </script>
