@@ -1,144 +1,156 @@
 <!DOCTYPE html>
 <html lang="th">
-
-<head>
-  <meta charset="UTF-8" />
-  <title>แก้ไขโปรไฟล์ | Edit Profile</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-      border-radius: 12px;
-      background: #f8f8f8;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-
-    input,
-    button {
-      display: block;
-      width: 100%;
-      margin: 10px 0;
-      padding: 10px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-
-    img {
-      display: block;
-      width: 120px;
-      height: 120px;
-      object-fit: cover;
-      border-radius: 8px;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-
-<body>
-  <h2>✏️ แก้ไขโปรไฟล์</h2>
-
-  <label>Username:</label>
-  <input type="text" id="username" placeholder="Username" />
-
-  <label>Email:</label>
-  <input type="email" id="email" placeholder="Email" />
-
-  <label>Password:</label>
-  <input type="password" id="password" placeholder="Password (กรอกเพื่อเปลี่ยนรหัส)" />
-
-  <label>Profile Image:</label>
-  <input type="file" id="file" accept="image/*" />
-  <img id="preview" src="" alt="Preview" />
-
-  <!-- ✅ ปุ่มอยู่นอก pre แล้ว -->
-  <button onclick="updateUser()">บันทึกการแก้ไข</button>
-  <button onclick="back()">กลับ</button>
-
-  <script>
-    const API_URL = "https://games-database-main.onrender.com/user";
-    const token = localStorage.getItem('token');
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-
-    if (!token || !storedUser) {
-      window.location.href = "login.html";
-    }
-
-    const uid = storedUser.uid;
-
-    async function loadUser() {
-      try {
-        const res = await fetch(`${API_URL}/${uid}`);
-        const data = await res.json();
-
-        document.getElementById('username').value = data.username;
-        document.getElementById('email').value = data.email;
-        document.getElementById('preview').src = data.profile
-          ? `https://games-database-main.onrender.com/uploads/${data.profile}`
-          : "https://via.placeholder.com/120";
-      } catch (err) {
-        console.error(err);
-        alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
+  <head>
+    <meta charset="UTF-8" />
+    <title>แก้ไขโปรไฟล์ | Edit Profile</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+        border-radius: 12px;
+        background: #f8f8f8;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
-    }
 
-    document.getElementById('file').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (file) {
-        document.getElementById('preview').src = URL.createObjectURL(file);
+      input,
+      button {
+        display: block;
+        width: 100%;
+        margin: 10px 0;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
       }
-    });
 
-    async function updateUser() {
-      const username = document.getElementById('username').value;
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const file = document.getElementById('file').files[0];
-
-      const formData = new FormData();
-      formData.append("username", username);
-      formData.append("email", email);
-      if (password) formData.append("password", password);
-      if (file) formData.append("file", file);
-
-      try {
-        const res = await fetch(`${API_URL}/${uid}`, {
-          method: "PUT",
-          body: formData
-        });
-
-        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        const data = await res.json();
-
-        alert("✅ อัปเดตข้อมูลสำเร็จ!");
-        storedUser.username = username;
-        storedUser.email = email;
-        storedUser.profile = data?.new_profile || storedUser.profile;
-        localStorage.setItem('user', JSON.stringify(storedUser));
-      } catch (err) {
-        console.error("❌ Update error:", err);
-        alert("❌ Error: " + err.message);
+      button {
+        background: #007bff;
+        color: white;
+        cursor: pointer;
       }
-    }
 
-    function back(){
-      // ✅ redirect หลังสำเร็จ
-      window.location.href = "profile.html";
-    }
+      button:hover {
+        background: #0056b3;
+      }
 
-    loadUser();
-  </script>
-</body>
+      img {
+        display: block;
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>✏️ แก้ไขโปรไฟล์</h2>
+
+    <label>Username:</label>
+    <input type="text" id="username" placeholder="Username" />
+
+    <label>Email:</label>
+    <input type="email" id="email" placeholder="Email" />
+
+    <label>Password:</label>
+    <input
+      type="password"
+      id="password"
+      placeholder="Password (กรอกเพื่อเปลี่ยนรหัส)"
+    />
+
+    <label>Profile Image:</label>
+    <input type="file" id="file" accept="image/*" />
+    <img id="preview" src="" alt="Preview" />
+
+    <!-- ✅ ปุ่มอยู่นอก pre แล้ว -->
+    <button onclick="updateUser()">บันทึกการแก้ไข</button>
+    <button onclick="back()">กลับ</button>
+
+    <script>
+      const API_URL = "https://games-database-main.onrender.com/user";
+      const token = localStorage.getItem("token");
+      const storedUser = JSON.parse(localStorage.getItem("user"));
+
+      if (!token || !storedUser) {
+        window.location.href = "login.html";
+      }
+
+      const uid = storedUser.uid;
+
+      async function loadUser() {
+        try {
+          const res = await fetch(`${API_URL}/${uid}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
+          const data = await res.json();
+
+          document.getElementById("username").value = data.username;
+          document.getElementById("email").value = data.email;
+          document.getElementById("preview").src = data.profile
+            ? `https://games-database-main.onrender.com/uploads/${data.profile}`
+            : "https://placehold.co/120x120?text=No+Image";
+        } catch (err) {
+          console.error(err);
+          alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
+        }
+      }
+
+      document.getElementById("file").addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (file) {
+          document.getElementById("preview").src = URL.createObjectURL(file);
+        }
+      });
+
+      async function updateUser() {
+        const username = document.getElementById("username").value;
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        const file = document.getElementById("file").files[0];
+
+        const formData = new FormData();
+        formData.append("username", username);
+        formData.append("email", email);
+        if (password) formData.append("password", password);
+        if (file) formData.append("file", file);
+
+        try {
+          const res = await fetch(`${API_URL}/${uid}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          if (!res.ok) throw new Error(`Server returned ${res.status}`);
+          const data = await res.json();
+
+          alert("✅ อัปเดตข้อมูลสำเร็จ!");
+          storedUser.username = username;
+          storedUser.email = email;
+          storedUser.profile = data?.new_profile || storedUser.profile;
+          localStorage.setItem("user", JSON.stringify(storedUser));
+        } catch (err) {
+          console.error("❌ Update error:", err);
+          alert("❌ Error: " + err.message);
+        }
+      }
+
+      function back() {
+        // ✅ redirect หลังสำเร็จ
+        window.location.href = "profile.html";
+      }
+
+      loadUser();
+    </script>
+  </body>
 </html>
