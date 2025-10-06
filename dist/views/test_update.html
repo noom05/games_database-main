@@ -71,7 +71,7 @@
     <button onclick="back()">กลับ</button>
 
     <script>
-      const API_URL = "http://localhost:3000/user";
+      const API_URL = "https://games-database-main.onrender.com/user";
       const token = localStorage.getItem("token");
       const storedUser = JSON.parse(localStorage.getItem("user"));
 
@@ -95,7 +95,7 @@
           document.getElementById("username").value = data.username;
           document.getElementById("email").value = data.email;
           document.getElementById("preview").src = data.profile
-            ? `http://localhost:3000/uploads/${data.profile}`
+            ? `https://games-database-main.onrender.com/uploads/${data.profile}`
             : "https://placehold.co/120x120?text=No+Image";
         } catch (err) {
           console.error(err);

@@ -71,13 +71,13 @@
         async function loadUser() {
             try {
                 const uid = user.uid;
-                const res = await fetch(`http://localhost:3000/user/${uid}`);
+                const res = await fetch(`https://games-database-main.onrender.com/user/${uid}`);
                 const data = await res.json();
 
                 document.getElementById("username").textContent = data.username;
                 document.getElementById("email").textContent = data.email;
                 document.getElementById("profile-img").src =
-                    data.profile ? `http://localhost:3000/uploads/${data.profile}`
+                    data.profile ? `https://games-database-main.onrender.com/uploads/${data.profile}`
                         : "https://via.placeholder.com/120";
 
             } catch (err) {
