@@ -171,7 +171,7 @@ exports.router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, fu
     const { username, password } = req.body;
     try {
         // 1. ตรวจสอบผู้ใช้
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE email = ?", [
+        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE username = ?", [
             username,
         ]);
         if (rows.length === 0)
