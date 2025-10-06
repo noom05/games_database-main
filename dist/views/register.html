@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ทดสอบอัปโหลดไฟล์ไปยัง MySQL</title>
+  <title>สมัครสมาชิก</title>
 </head>
 <body>
-  <h2>📤 ทดสอบอัปโหลดข้อมูลผู้ใช้ + รูปภาพ</h2>
+  <h2>สมัครสมาชิก</h2>
 
   <form id="uploadForm">
     <label>Username:</label>
@@ -21,10 +21,9 @@
     <label>เลือกรูปภาพโปรไฟล์:</label>
     <input type="file" id="file" name="file" accept="image/*" /><br /><br />
 
-    <button type="submit">อัปโหลด</button>
+    <button type="submit">สมัคร</button>
+    <button onclick="login()">เข้าสู่ระบบ</button>
   </form>
-
-  <pre id="result"></pre>
 
   <script>
     const form = document.getElementById("uploadForm");
@@ -45,7 +44,7 @@
       }
 
       try {
-        const response = await fetch("https://games-database-main.onrender.com/user", {
+        const response = await fetch("https://games-database-main.onrender.com/user/register", {
           method: "POST",
           body: formData,
         });
@@ -56,6 +55,10 @@
         result.textContent = "❌ Error: " + err.message;
       }
     });
+
+    function login(){
+      window.location.href = "login.html";
+    }
   </script>
 </body>
 </html>
