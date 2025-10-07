@@ -18,16 +18,8 @@ app.use(
   })
 );
 
-
-
-
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "views")));
+// ✅ วางไว้ท้ายสุด หลังจาก mount ทุก route แล้ว
 app.use("/assets", express.static(path.join(__dirname, "assets")));
-app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "views/pagenotfound.html"));
-});
-
 app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
   if (err.name === "UnauthorizedError") {
     res.status(err.status).send({ message: err.message });
@@ -36,16 +28,21 @@ app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
   next();
 });
 
-// Test Token
 app.use("/testtoken", (req, res) => {
   const payload: any = { username: "siriwat" };
   const jwttoken = generateToken(payload, secret);
-  res.status(200).json({
-    token: jwttoken,
-  });
+  res.status(200).json({ token: jwttoken });
 });
 
 app.use(bodyParser.text());
 app.use(bodyParser.json());
 app.use("/", index);
 app.use("/user", user);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/assets", express.static(path.join(__dirname, "assets")));
+app.use(express.static(path.join(__dirname, "views")));
+
+// ✅ วางไว้ท้ายสุด
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "views/pagenotfound.html"));
+});

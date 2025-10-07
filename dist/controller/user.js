@@ -35,9 +35,11 @@ exports.router.get("/", verifyToken_1.verifyToken, (0, authorize_1.authorizeRole
     }
 }));
 //get user by id
-exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/:id", verifyToken_1.verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = +req.params.id;
+        if (!id)
+            return res.status(400).json({ error: "Missing user ID" });
         const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
         const users = rows;
         if (users.length === 0) {

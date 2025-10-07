@@ -18,13 +18,8 @@ exports.app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
-
-exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
-exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
+// ✅ วางไว้ท้ายสุด หลังจาก mount ทุก route แล้ว
 exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
-exports.app.use((req, res) => {
-    res.status(404).sendFile(path_1.default.join(__dirname, "views/pagenotfound.html"));
-});
 exports.app.use(jwtauth_1.jwtAuthen, (err, req, res, next) => {
     if (err.name === "UnauthorizedError") {
         res.status(err.status).send({ message: err.message });
@@ -32,15 +27,19 @@ exports.app.use(jwtauth_1.jwtAuthen, (err, req, res, next) => {
     }
     next();
 });
-// Test Token
 exports.app.use("/testtoken", (req, res) => {
     const payload = { username: "siriwat" };
     const jwttoken = (0, jwtauth_1.generateToken)(payload, jwtauth_1.secret);
-    res.status(200).json({
-        token: jwttoken,
-    });
+    res.status(200).json({ token: jwttoken });
 });
 exports.app.use(body_parser_1.default.text());
 exports.app.use(body_parser_1.default.json());
 exports.app.use("/", index_1.router);
 exports.app.use("/user", user_1.router);
+exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
+exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
+exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
+// ✅ วางไว้ท้ายสุด
+exports.app.use((req, res) => {
+    res.status(404).sendFile(path_1.default.join(__dirname, "views/pagenotfound.html"));
+});
