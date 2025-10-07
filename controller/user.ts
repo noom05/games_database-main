@@ -1,5 +1,5 @@
 import express from "express";
-import { conn } from "../dist/dbconnect";
+import { conn } from "../db/dbconnect";
 import { Users } from "../model/user";
 import mysql from "mysql2";
 import bcrypt from "bcrypt";

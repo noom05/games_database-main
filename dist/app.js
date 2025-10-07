@@ -18,7 +18,6 @@ exports.app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
-// ✅ วางไว้ท้ายสุด หลังจาก mount ทุก route แล้ว
 exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
 exports.app.use(jwtauth_1.jwtAuthen, (err, req, res, next) => {
     if (err.name === "UnauthorizedError") {

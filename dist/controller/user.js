@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.router = void 0;
 const express_1 = __importDefault(require("express"));
-const dbconnect_1 = require("../dist/dbconnect");
+const dbconnect_1 = require("../db/dbconnect");
 const mysql2_1 = __importDefault(require("mysql2"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const fileMiddleware_1 = require("../middleware/fileMiddleware");
@@ -35,11 +35,9 @@ exports.router.get("/", verifyToken_1.verifyToken, (0, authorize_1.authorizeRole
     }
 }));
 //get user by id
-exports.router.get("/:id", verifyToken_1.verifyToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = +req.params.id;
-        if (!id)
-            return res.status(400).json({ error: "Missing user ID" });
         const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
         const users = rows;
         if (users.length === 0) {

@@ -18,7 +18,6 @@ app.use(
   })
 );
 
-// ✅ วางไว้ท้ายสุด หลังจาก mount ทุก route แล้ว
 app.use("/assets", express.static(path.join(__dirname, "assets")));
 app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
   if (err.name === "UnauthorizedError") {
@@ -40,9 +39,5 @@ app.use("/", index);
 app.use("/user", user);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/assets", express.static(path.join(__dirname, "assets")));
-app.use(express.static(path.join(__dirname, "views")));
 
-// ✅ วางไว้ท้ายสุด
-app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "views/pagenotfound.html"));
-});
+
