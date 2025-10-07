@@ -18,12 +18,32 @@
         object-fit: cover;
       }
 
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #f4f4f4;
+      }
+
+      .navbar {
+        background-color: #ff6600 !important;
+      }
+
+      .navbar .nav-link,
+      .navbar .navbar-brand {
+        color: white !important;
+        font-weight: bold;
+      }
+
+      .navbar .btn-danger {
+        background-color: #dc3545;
+        border: none;
+      }
+
       .banner {
         background-image: url("/assets/fc26.jpg");
-        background-size: cover; /* ✅ ครอบเต็มพื้นที่ */
+        background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        height: 500px; /* ✅ เพิ่มความสูงให้ภาพเด่นขึ้น */
+        height: 500px;
         position: relative;
         border-radius: 10px;
         margin-bottom: 30px;
@@ -40,12 +60,24 @@
         border-radius: 0 0 10px 10px;
         text-align: center;
       }
+
+      .card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .card .btn {
+        border-radius: 5px;
+      }
     </style>
   </head>
   <body class="bg-light">
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
-      <a class="navbar-brand" href="#">GameStore</a>
+    <nav class="navbar navbar-expand-lg px-4">
+      <a class="navbar-brand" href="#"
+        ><i class="bi bi-controller me-2"></i>GameStore</a
+      >
       <button
         class="navbar-toggler"
         type="button"
@@ -55,21 +87,21 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
-        <!-- <form class="d-flex ms-auto me-3">
-        <input class="form-control me-2" type="search" placeholder="ค้นหาเกม" />
-        <button class="btn btn-outline-light" type="submit">ค้นหา</button>
-      </form> -->
-        <ul class="navbar-nav d-flex ms-auto me-3">
-          <li class="nav-item">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="#">หน้าหลัก</a></li>
+          <li class="nav-item"><a class="nav-link" href="#">คลังเกม</a></li>
+        </ul>
+        <ul class="navbar-nav d-flex align-items-center">
+          <li class="nav-item me-3">
             <a class="nav-link" href="#"><i class="bi bi-cart"></i> ตะกร้า</a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item me-3">
             <a class="nav-link" href="profile.html"
               ><i class="bi bi-person-circle"></i> โปรไฟล์</a
             >
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="login.html">ออกจากระบบ</a>
+            <a class="btn btn-sm btn-danger" href="login.html">ออกจากระบบ</a>
           </li>
         </ul>
       </div>
@@ -154,7 +186,6 @@
         window.location.href = "/login.html";
       }
 
-      
       if (user.role === "admin") {
         document.getElementById("adminPanel").style.display = "block";
       } else {

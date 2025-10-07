@@ -3,15 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <title>แก้ไขโปรไฟล์ | Edit Profile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
     <style>
       body {
         font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+      }
+
+      .navbar {
+        background-color: #ff6600;
+      }
+
+      .navbar .nav-link,
+      .navbar .navbar-brand {
+        color: white !important;
+        font-weight: bold;
+      }
+
+      .container {
         max-width: 600px;
-        margin: 40px auto;
-        padding: 20px;
+        margin: 60px auto;
+      }
+
+      .card {
+        background: white;
+        padding: 30px;
         border-radius: 12px;
-        background: #f8f8f8;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       }
 
       input,
@@ -29,10 +57,17 @@
         background: #007bff;
         color: white;
         cursor: pointer;
+        border: none;
       }
 
       button:hover {
         background: #0056b3;
+      }
+
+      .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        border: none;
       }
 
       img {
@@ -41,34 +76,73 @@
         height: 120px;
         object-fit: cover;
         border-radius: 8px;
-        margin-top: 10px;
+        margin: 10px auto;
       }
     </style>
   </head>
-
   <body>
-    <h2>✏️ แก้ไขโปรไฟล์</h2>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg px-4">
+      <a class="navbar-brand fw-bold" href="#"
+        ><i class="bi bi-controller me-2"></i>GameStore</a
+      >
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#navbarNav"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html">หน้าหลัก</a>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="#">คลัง</a></li>
+        </ul>
+        <ul class="navbar-nav d-flex align-items-center">
+          <li class="nav-item me-3">
+            <a class="nav-link" href="#"><i class="bi bi-cart"></i> ตะกร้า</a>
+          </li>
+          <li class="nav-item me-3">
+            <a class="nav-link" href="profile.html"
+              ><i class="bi bi-person-circle"></i> โปรไฟล์</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="btn btn-sm btn-danger" href="login.html">ออกจากระบบ</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
 
-    <label>Username:</label>
-    <input type="text" id="username" placeholder="Username" />
+    <!-- Form -->
+    <div class="container">
+      <div class="card">
+        <h4 class="text-center mb-4">✏️ แก้ไขโปรไฟล์</h4>
 
-    <label>Email:</label>
-    <input type="email" id="email" placeholder="Email" />
+        <label>Username:</label>
+        <input type="text" id="username" placeholder="Username" />
 
-    <label>Password:</label>
-    <input
-      type="password"
-      id="password"
-      placeholder="Password (กรอกเพื่อเปลี่ยนรหัส)"
-    />
+        <label>Email:</label>
+        <input type="email" id="email" placeholder="Email" />
 
-    <label>Profile Image:</label>
-    <input type="file" id="file" accept="image/*" />
-    <img id="preview" src="" alt="Preview" />
+        <label>Password:</label>
+        <input
+          type="password"
+          id="password"
+          placeholder="Password (กรอกเพื่อเปลี่ยนรหัส)"
+        />
 
-    <!-- ✅ ปุ่มอยู่นอก pre แล้ว -->
-    <button onclick="updateUser()">บันทึกการแก้ไข</button>
-    <button onclick="back()">กลับ</button>
+        <label>Profile Image:</label>
+        <input type="file" id="file" accept="image/*" />
+        <img id="preview" src="" alt="Preview" />
+
+        <button onclick="updateUser()">บันทึกการแก้ไข</button>
+        <button class="btn btn-secondary" onclick="back()">กลับ</button>
+      </div>
+    </div>
 
     <script>
       const API_URL = "https://games-database-main.onrender.com/user";
@@ -84,9 +158,7 @@
       async function loadUser() {
         try {
           const res = await fetch(`${API_URL}/${uid}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           });
 
           if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -96,20 +168,16 @@
           document.getElementById("email").value = data.email;
 
           const preview = document.getElementById("preview");
-
           if (data.profile) {
             try {
               const imageRes = await fetch(
                 `https://games-database-main.onrender.com/uploads/${data.profile}`,
                 {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
+                  headers: { Authorization: `Bearer ${token}` },
                 }
               );
 
               if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
-
               const blob = await imageRes.blob();
               preview.src = URL.createObjectURL(blob);
             } catch (imgErr) {
@@ -147,9 +215,7 @@
         try {
           const res = await fetch(`${API_URL}/${uid}`, {
             method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
             body: formData,
           });
 
@@ -168,7 +234,6 @@
       }
 
       function back() {
-        // ✅ redirect หลังสำเร็จ
         window.location.href = "profile.html";
       }
 
