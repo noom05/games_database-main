@@ -18,6 +18,9 @@ exports.app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
+exports.app.use((req, res) => {
+    res.status(404).sendFile(path_1.default.join(__dirname, "views/pagenotfound.html"));
+});
 exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
 exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
 exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
