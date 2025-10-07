@@ -17,7 +17,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/assets", express.static(path.join(__dirname, "assets")));
 app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
   if (err.name === "UnauthorizedError") {
@@ -37,7 +37,3 @@ app.use(bodyParser.text());
 app.use(bodyParser.json());
 app.use("/", index);
 app.use("/user", user);
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/assets", express.static(path.join(__dirname, "assets")));
-
-

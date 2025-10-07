@@ -13,7 +13,7 @@ exports.jwtAuthen = (0, express_jwt_1.expressjwt)({
     secret: exports.secret,
     algorithms: ["HS256"],
 }).unless({
-    path: ["/", "/user/register", "/user/login", "/testtoken"],
+    path: ["/", "/user/register", "/user/login", "/testtoken", "/uploads",],
 });
 function generateToken(payload, secretKey) {
     const token = jsonwebtoken_1.default.sign(payload, secretKey, {

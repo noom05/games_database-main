@@ -188,12 +188,7 @@
             }
           );
 
-          if (!res.ok) {
-            const text = await res.text(); // อ่าน HTML error ถ้ามี
-            console.warn("Server response:", text);
-            throw new Error("โหลดข้อมูลไม่สำเร็จ: " + res.status);
-          }
-
+          if (!res.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
           const data = await res.json();
 
           document.getElementById("username").textContent =
@@ -204,23 +199,10 @@
           document.getElementById("displayname").textContent =
             data.displayname || "-";
 
+          // ✅ โหลดรูปแบบถาวร ไม่ใช้ blob
           const profileImg = document.getElementById("profile-img");
           if (data.profile) {
-            try {
-              const imageRes = await fetch(
-                `https://games-database-main.onrender.com/uploads/${data.profile}`,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
-              const blob = await imageRes.blob();
-              profileImg.src = URL.createObjectURL(blob);
-            } catch (imgErr) {
-              console.warn("⚠️ โหลดรูปไม่สำเร็จ:", imgErr);
-              profileImg.src = "https://placehold.co/140x140?text=No+Image";
-            }
+            profileImg.src = `https://games-database-main.onrender.com/uploads/${data.profile}`;
           } else {
             profileImg.src = "https://placehold.co/140x140?text=No+Image";
           }

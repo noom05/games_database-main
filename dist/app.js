@@ -18,6 +18,7 @@ exports.app.use((0, cors_1.default)({
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
+exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
 exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
 exports.app.use(jwtauth_1.jwtAuthen, (err, req, res, next) => {
     if (err.name === "UnauthorizedError") {
@@ -35,10 +36,3 @@ exports.app.use(body_parser_1.default.text());
 exports.app.use(body_parser_1.default.json());
 exports.app.use("/", index_1.router);
 exports.app.use("/user", user_1.router);
-exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
-exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
-exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
-// ✅ วางไว้ท้ายสุด
-exports.app.use((req, res) => {
-    res.status(404).sendFile(path_1.default.join(__dirname, "views/pagenotfound.html"));
-});

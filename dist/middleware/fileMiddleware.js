@@ -60,7 +60,7 @@ class FileMiddleware {
                 },
             }),
             limits: {
-                fileSize: 67108864, // 64 MByte
+                fileSize: 67108864, // 64 MByte 
             },
         });
         const uploadsDir = path_1.default.join(__dirname, "../uploads");

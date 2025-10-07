@@ -4,5 +4,5 @@ import path from "path";
 export const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../views/login.html"));
+  res.send('Get in index.ts');
 });

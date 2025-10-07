@@ -6,7 +6,7 @@ export const jwtAuthen = expressjwt({
   secret: secret,
   algorithms: ["HS256"],
 }).unless({
-  path: ["/", "/user/register", "/user/login", "/testtoken"],
+  path: ["/", "/user/register", "/user/login", "/testtoken", "/uploads",],
 });
 
 export function generateToken(payload: any, secretKey: string): string {
