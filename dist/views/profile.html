@@ -94,7 +94,7 @@
       class="navbar navbar-expand-lg navbar-dark px-4"
       style="background-color: #ff6600"
     >
-      <a class="navbar-brand fw-bold" href="#">
+      <a class="navbar-brand fw-bold" href="dashboard.html">
         <i class="bi bi-controller me-2"></i>GameStore
       </a>
       <button
@@ -111,11 +111,15 @@
           <li class="nav-item">
             <a class="nav-link" href="dashboard.html">หน้าหลัก</a>
           </li>
-          <li class="nav-item"><a class="nav-link" href="#">คลัง</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="pagenotfound.html">คลัง</a>
+          </li>
         </ul>
         <ul class="navbar-nav d-flex align-items-center">
           <li class="nav-item me-3">
-            <a class="nav-link" href="#"><i class="bi bi-cart"></i> ตะกร้า</a>
+            <a class="nav-link" href="pagenotfound.html"
+              ><i class="bi bi-cart"></i> ตะกร้า</a
+            >
           </li>
           <li class="nav-item me-3">
             <a class="nav-link" href="profile.html"
@@ -184,9 +188,13 @@
             }
           );
 
+          if (!res.ok) {
+            const text = await res.text(); // อ่าน HTML error ถ้ามี
+            console.warn("Server response:", text);
+            throw new Error("โหลดข้อมูลไม่สำเร็จ: " + res.status);
+          }
+
           const data = await res.json();
-          if (!res.ok)
-            throw new Error(data.message || "ไม่สามารถโหลดข้อมูลได้");
 
           document.getElementById("username").textContent =
             data.username || "-";
@@ -198,18 +206,26 @@
 
           const profileImg = document.getElementById("profile-img");
           if (data.profile) {
-            const imageRes = await fetch(
-              `https://games-database-main.onrender.com/uploads/${data.profile}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-            if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
-            const blob = await imageRes.blob();
-            profileImg.src = URL.createObjectURL(blob);
+            try {
+              const imageRes = await fetch(
+                `https://games-database-main.onrender.com/uploads/${data.profile}`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+
+              if (!imageRes.ok) throw new Error("โหลดรูปไม่สำเร็จ");
+              const blob = await imageRes.blob();
+              profileImg.src = URL.createObjectURL(blob);
+            } catch (imgErr) {
+              console.warn("⚠️ โหลดรูปไม่สำเร็จ:", imgErr);
+              profileImg.src = "https://placehold.co/140x140?text=No+Image";
+            }
+          } else {
+            profileImg.src = "https://placehold.co/140x140?text=No+Image";
           }
         } catch (err) {
-          console.error("❌ Error:", err);
+          console.error("❌ Error loading user:", err);
           alert("โหลดข้อมูลผู้ใช้ไม่สำเร็จ: " + err.message);
         }
       }
