@@ -18,14 +18,15 @@ app.use(
   })
 );
 
-app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "views/pagenotfound.html"));
-});
+
 
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "views")));
 app.use("/assets", express.static(path.join(__dirname, "assets")));
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "views/pagenotfound.html"));
+});
 
 app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
   if (err.name === "UnauthorizedError") {
