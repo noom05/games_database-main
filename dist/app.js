@@ -38,3 +38,4 @@ exports.app.use(body_parser_1.default.json());
 exports.app.use("/", index_1.router);
 exports.app.use("/user", user_1.router);
 exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
+exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));

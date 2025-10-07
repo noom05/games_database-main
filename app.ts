@@ -40,4 +40,5 @@ app.use(bodyParser.json());
 app.use("/", index);
 app.use("/user", user);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(express.static(path.join(__dirname, "views")));
 
