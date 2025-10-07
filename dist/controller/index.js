@@ -8,5 +8,5 @@ const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 exports.router = express_1.default.Router();
 exports.router.get("/", (req, res) => {
-    res.sendFile(path_1.default.join(__dirname, "../views/register.html"));
+    res.sendFile(path_1.default.join(__dirname, "../views/login.html"));
 });
