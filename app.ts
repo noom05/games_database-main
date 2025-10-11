@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import { router as index } from "./controller/index";
 import { router as user } from "./controller/user";
+import { router as games } from "./controller/games";
+
 import bodyParser from "body-parser";
 import path from "path";
 import { generateToken, jwtAuthen, secret } from "./auth/jwtauth";
@@ -37,3 +39,4 @@ app.use(bodyParser.text());
 app.use(bodyParser.json());
 app.use("/", index);
 app.use("/user", user);
+app.use("/games", games);
