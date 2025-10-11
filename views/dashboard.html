@@ -96,7 +96,7 @@
             <a class="nav-link" href="dashboard.html">หน้าหลัก</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="pagenotfound.html">คลังเกม</a>
+            <a class="nav-link" href="pagenotfound.html">คลัง</a>
           </li>
         </ul>
         <ul class="navbar-nav d-flex align-items-center">
@@ -192,6 +192,7 @@
           <div class="card-header bg-warning text-dark">Admin Tools</div>
           <div class="card-body">
             <ul>
+              <li><a href="/admin/add-game.html">เพิ่มเกม</a></li>
               <li><a href="/admin/create.html">Manage Users</a></li>
               <li><a href="/admin/logs.html">View Logs</a></li>
             </ul>
@@ -215,6 +216,7 @@
 
       if (user && token) {
         document.getElementById("mainNavbar").style.display = "flex";
+
         if (user.role === "admin") {
           document.getElementById("adminPanel").style.display = "block";
         } else {
