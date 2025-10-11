@@ -171,7 +171,8 @@ router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
             if (originalUser.profile) {
                 fileUpload.deleteFile(originalUser.profile);
             }
-            profileFilename = req.file.filename;
+            profileFilename = req.file?.filename;
+            console.log("📦 Uploaded file:", profileFilename);
         }
 
         let hashedPassword = originalUser.password;
@@ -188,7 +189,7 @@ router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
             id,
         ]);
 
-        res.status(200).json({ message: "User updated successfully" });
+        res.status(200).json({ profile: profileFilename });
     } catch (err) {
         console.error("PUT /user/:id error:", err);
         res.status(500).json({ error: "Internal Server Error" });
