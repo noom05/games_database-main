@@ -10,6 +10,7 @@ import { generateToken, jwtAuthen, secret } from "./auth/jwtauth";
 
 export const app = express();
 
+
 app.use(express.static(path.join(__dirname, "views")));
 
 app.use(

@@ -44,47 +44,34 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST (Register)
-router.post(
-  "/register",
-  fileUpload.diskLoader.single("file"), // multer middleware
-  async (req, res) => {
-    try {
-      const user: Users = req.body;
-      const profileFilename = req.file ? req.file.filename : null;
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+router.post('/register', async (req, res) => {
+  try {
+    console.log('POST /user/register req.headers:', req.headers);
+    console.log('POST /user/register req.body:', req.body);
 
-      const sql =
-        "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";
-      const formattedSql = mysql.format(sql, [
-        user.username,
-        user.email,
-        hashedPassword,
-        profileFilename,
-      ]);
-
-      const [result] = await conn.query(formattedSql);
-      const info = result as mysql.ResultSetHeader;
-
-      res.status(201).json({
-        message: "สมัครสมาชิกสำเร็จ",
-        user: {
-          uid: info.insertId, // Note: This might not be the correct UID if it's a UUID/string
-          username: user.username,
-          email: user.email,
-          profile: profileFilename,
-          role: "user",
-        },
-      });
-    } catch (err) {
-      console.error("POST /user/register error:", err);
-      // ตรวจจับ Error กรณี username/email ซ้ำ
-      if ((err as any).code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ error: 'ชื่อผู้ใช้หรืออีเมลนี้มีอยู่แล้วในระบบ' });
-      }
-      res.status(500).json({ error: "Internal Server Error" });
+    const user = req.body;
+    if (!user || !user.username || !user.email || !user.password) {
+      return res.status(400).json({ error: 'ข้อมูลไม่ครบ' });
     }
+
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const sql = "INSERT INTO `users`(`username`,`email`,`password`) VALUES (?,?,?)";
+    const formattedSql = mysql.format(sql, [user.username, user.email, hashedPassword]);
+    const [result] = await conn.query(formattedSql);
+    const info = result as mysql.ResultSetHeader;
+
+    res.status(201).json({
+      message: 'สมัครสมาชิกสำเร็จ',
+      user: { uid: info.insertId, username: user.username, email: user.email, role: 'user' }
+    });
+  } catch (err) {
+    console.error('POST /user/register error:', err);
+    if ((err as any).code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'ชื่อผู้ใช้หรืออีเมลนี้มีอยู่แล้วในระบบ' });
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-);
+});
 
 // POST (Login)
 router.post("/login", async (req, res) => {
