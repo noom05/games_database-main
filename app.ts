@@ -21,13 +21,24 @@ app.use(
 );
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/assets", express.static(path.join(__dirname, "assets")));
-app.use(jwtAuthen, (err: any, req: any, res: any, next: any) => {
-  if (err.name === "UnauthorizedError") {
-    res.status(err.status).send({ message: err.message });
-    return;
+// เราจะใช้ .unless() เพื่อบอกว่า Middleware นี้จะไม่ทำงานกับ path ที่ระบุไว้
+app.use(
+  jwtAuthen.unless({
+    path: [
+      "/user/login",      // ยกเว้นหน้า Login
+      "/user/register",   // ยกเว้นหน้า Register
+      "/testtoken",       // ยกเว้นหน้า Test Token
+      { url: /^\/games(\/.*)?$/, methods: ['GET'] } 
+    ],
+  }),
+  (err: any, req: any, res: any, next: any) => {
+    if (err.name === "UnauthorizedError") {
+      res.status(err.status).send({ message: err.message });
+      return;
+    }
+    next();
   }
-  next();
-});
+);
 
 app.use("/testtoken", (req, res) => {
   const payload: any = { username: "siriwat" };
