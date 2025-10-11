@@ -91,7 +91,7 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav me-auto">
+        <ul class="navbar-nav me-auto" id="navUser" style="display: none">
           <li class="nav-item">
             <a class="nav-link" href="dashboard.html">หน้าหลัก</a>
           </li>
@@ -99,6 +99,19 @@
             <a class="nav-link" href="pagenotfound.html">คลัง</a>
           </li>
         </ul>
+
+        <ul class="navbar-nav me-auto" id="navAdmin" style="display: none">
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html">หน้าหลัก</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">ประวัติการทำธุรกรรมที่ผ่านมา</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">โค้ดส่วนลด</a>
+          </li>
+        </ul>
+
         <ul class="navbar-nav d-flex align-items-center">
           <li class="nav-item me-3">
             <a class="nav-link" href="pagenotfound.html"
@@ -174,15 +187,21 @@
       <h5 class="mb-3">All Games</h5>
       <div class="row row-cols-1 row-cols-md-4 g-3 mb-5">
         <div class="col">
-          <div class="card game-card">
-            <img src="/assets/fc26.jpg" class="card-img-top" alt="FC 26" />
-            <div class="card-body text-center">
-              <h6 class="card-title">FC 26</h6>
-              <p class="text-success fw-bold">฿1990.00</p>
-              <button class="btn btn-sm btn-outline-success">Buy Now</button>
+          <a
+            href="detail.html?id=fc26"
+            class="text-decoration-none text-dark"
+          >
+            <div class="card game-card">
+              <img src="/assets/fc26.jpg" class="card-img-top" alt="FC 26" />
+              <div class="card-body text-center">
+                <h6 class="card-title">FC 26</h6>
+                <p class="text-success fw-bold">฿1990.00</p>
+                <button class="btn btn-sm btn-outline-success">Buy Now</button>
+              </div>
             </div>
-          </div>
+          </a>
         </div>
+
         <!-- เพิ่มเกมอื่น ๆ -->
       </div>
 
@@ -192,9 +211,7 @@
           <div class="card-header bg-warning text-dark">Admin Tools</div>
           <div class="card-body">
             <ul>
-              <li><a href="/admin/add-game.html">เพิ่มเกม</a></li>
-              <li><a href="/admin/create.html">Manage Users</a></li>
-              <li><a href="/admin/logs.html">View Logs</a></li>
+              <li><a href="add-game.html">เพิ่มเกม</a></li>
             </ul>
           </div>
         </div>
@@ -218,8 +235,10 @@
         document.getElementById("mainNavbar").style.display = "flex";
 
         if (user.role === "admin") {
+          document.getElementById("navAdmin").style.display = "flex";
           document.getElementById("adminPanel").style.display = "block";
         } else {
+          document.getElementById("navUser").style.display = "flex";
           document.getElementById("userPanel").style.display = "block";
         }
       } else {
