@@ -98,7 +98,7 @@
             body: JSON.stringify({ username, password }),
           });
 
-          const text = await res.text();
+          const text = await res.json();
           let data;
           try {
             data = JSON.parse(text);
