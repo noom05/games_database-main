@@ -48,6 +48,8 @@
         cursor: pointer;
       }
 
+      
+
       .main-content {
         background-color: white;
         padding: 30px;
@@ -141,9 +143,20 @@
         <!-- Sidebar -->
         <div class="col-md-3 sidebar">
           <ul>
-            <li>โปรไฟล์</li>
-            <li>รอดำเนิน</li>
-            <li>ประวัติ</li>
+            <li>
+              <a href="profile.html" class="text-decoration-none text-dark"
+                >โปรไฟล์</a
+              >
+            </li>
+            <li><a href="wallet.html" class="text-decoration-none text-dark fw-bold">Wallet</a></li>
+
+            <li>
+              <a
+                href="transaction-history.html"
+                class="text-decoration-none text-dark"
+                >ประวัติ</a
+              >
+            </li>
           </ul>
         </div>
 
@@ -219,7 +232,7 @@
       }
 
       function editProfile() {
-        window.location.href = `test_update.html?uid=${user.uid}`;
+        window.location.href = `edit-profile.html?uid=${user.uid}`;
       }
 
       loadUser();
