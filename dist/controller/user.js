@@ -15,18 +15,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.router = void 0;
 const express_1 = __importDefault(require("express"));
 const dbconnect_1 = require("../db/dbconnect");
-const mysql2_1 = __importDefault(require("mysql2"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const fileMiddleware_1 = require("../middleware/fileMiddleware");
-const verifyToken_1 = require("../middleware/verifyToken");
-const authorize_1 = require("../middleware/authorize");
 const jwtauth_1 = require("../auth/jwtauth");
 exports.router = express_1.default.Router();
-/////-------------Users---------------//////
-//get all user
-exports.router.get("/", verifyToken_1.verifyToken, (0, authorize_1.authorizeRole)(["admin"]), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// --- User Management Routes ---
+// GET all users
+exports.router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users");
+        const [rows] = yield dbconnect_1.conn.query("SELECT uid, username, email, role, profile FROM users");
         res.json(rows);
     }
     catch (err) {
@@ -34,51 +31,130 @@ exports.router.get("/", verifyToken_1.verifyToken, (0, authorize_1.authorizeRole
         res.status(500).json({ error: "Cannot read users data" });
     }
 }));
-//get user by id
+// --- Wallet & Transaction Routes ---
+// GET Wallet Balance
+exports.router.get("/wallet/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const userId = req.params.id;
+    const [rows] = yield dbconnect_1.conn.query("SELECT balance FROM wallet WHERE user_id = ?", [userId]);
+    if (rows.length === 0) {
+        return res.status(404).json({ error: "Wallet not found" });
+    }
+    res.json(rows[0]);
+}));
+// POST Top-up Wallet
+exports.router.post("/wallet/topup", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { user_id, amount } = req.body;
+    const connection = yield dbconnect_1.conn.getConnection();
+    try {
+        yield connection.beginTransaction();
+        const [rows] = yield connection.query("SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE", [user_id]);
+        if (rows.length === 0) {
+            yield connection.query("INSERT INTO wallet (user_id, balance) VALUES (?, ?)", [user_id, amount]);
+        }
+        else {
+            yield connection.query("UPDATE wallet SET balance = balance + ? WHERE user_id = ?", [amount, user_id]);
+        }
+        yield connection.query("INSERT INTO transaction (user_id, type, amount) VALUES (?, 'topup', ?)", [user_id, amount]);
+        yield connection.commit();
+        res.json({ message: "Top-up successful" });
+    }
+    catch (err) {
+        yield connection.rollback();
+        res.status(500).json({ error: "Top-up failed", detail: err });
+    }
+    finally {
+        connection.release();
+    }
+}));
+// POST Purchase Game
+exports.router.post("/wallet/purchase", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { user_id, game_id } = req.body;
+    const connection = yield dbconnect_1.conn.getConnection();
+    try {
+        yield connection.beginTransaction();
+        const [gameRows] = yield connection.query("SELECT id, game_name, price FROM games WHERE id = ? FOR UPDATE", [game_id]);
+        const [walletRows] = yield connection.query("SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE", [user_id]);
+        if (gameRows.length === 0)
+            throw new Error("Game not found");
+        if (walletRows.length === 0)
+            throw new Error("Wallet not found");
+        const game = gameRows[0];
+        const wallet = walletRows[0];
+        const [duplicateCheck] = yield connection.query("SELECT id FROM transaction WHERE user_id = ? AND game_id = ? AND type = 'purchase'", [user_id, game_id]);
+        if (duplicateCheck.length > 0) {
+            throw new Error("You already purchased this game");
+        }
+        if (wallet.balance < game.price) {
+            throw new Error("Not enough balance");
+        }
+        yield connection.query("UPDATE wallet SET balance = balance - ? WHERE user_id = ?", [game.price, user_id]);
+        const [updatedWallet] = yield connection.query("SELECT balance FROM wallet WHERE user_id = ?", [user_id]);
+        const [transactionResult] = yield connection.query("INSERT INTO transaction (user_id, type, amount, game_id) VALUES (?, 'purchase', ?, ?)", [user_id, game.price, game_id]);
+        yield connection.commit();
+        res.json({
+            message: "Purchase successful",
+            balance: updatedWallet[0].balance,
+        });
+    }
+    catch (err) {
+        yield connection.rollback();
+        res.status(500).json({ error: err.message });
+    }
+    finally {
+        connection.release();
+    }
+}));
+// GET User's Transaction History
+exports.router.get("/history/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const userId = req.params.id;
+    const [rows] = yield dbconnect_1.conn.query(`SELECT t.*, g.game_name 
+         FROM transaction t
+         LEFT JOIN games g ON t.game_id = g.id
+         WHERE t.user_id = ?
+         ORDER BY t.transaction_date DESC`, [userId]);
+    res.json(rows);
+}));
+// GET All Transactions (For Admin)
+exports.router.get("/admin/history", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const [rows] = yield dbconnect_1.conn.query(`SELECT t.*, u.username, g.game_name 
+         FROM transaction t
+         LEFT JOIN users u ON t.user_id = u.uid
+         LEFT JOIN games g ON t.game_id = g.id
+         ORDER BY t.transaction_date DESC`);
+    res.json(rows);
+}));
+// GET user by id
 exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const id = +req.params.id;
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
+        const id = req.params.id;
+        const [rows] = yield dbconnect_1.conn.query("SELECT uid, username, email, role, profile FROM users WHERE uid = ?", [id]);
         const users = rows;
         if (users.length === 0) {
             return res.status(404).json({ error: "User not found" });
         }
-        const user = users[0];
-        res.json(user);
+        res.json(users[0]);
     }
     catch (err) {
         console.error("GET /user/:id error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 }));
-exports.router.post("/register", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware
-(req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+// POST (Register) a new user
+exports.router.post("/register", fileMiddleware_1.fileUpload.diskLoader.single("file"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const user = req.body;
-        const profileFilename = ((_a = req.file) === null || _a === void 0 ? void 0 : _a.filename) || null;
+        const profileFilename = req.file ? req.file.filename : null;
         const hashedPassword = yield bcrypt_1.default.hash(user.password, 10);
-        // 1️⃣ เพิ่มลงฐานข้อมูล
-        const sql = "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";
-        const formattedSql = mysql2_1.default.format(sql, [
+        const sql = "INSERT INTO `users`(`username`,`email`,`password`,`profile`, `role`) VALUES (?,?,?,?,'user')";
+        const [result] = yield dbconnect_1.conn.query(sql, [
             user.username,
             user.email,
             hashedPassword,
             profileFilename,
         ]);
-        const [result] = yield dbconnect_1.conn.query(formattedSql);
         const info = result;
-        // 2️⃣ สร้าง JWT token
-        const payload = {
-            uid: info.insertId,
-            username: user.username,
-            role: "user", // default role เป็น user
-        };
-        const token = (0, jwtauth_1.generateToken)(payload, jwtauth_1.secret);
-        // 3️⃣ ส่ง response พร้อม token
         res.status(201).json({
             message: "สมัครสมาชิกสำเร็จ",
-            token,
             user: {
                 uid: info.insertId,
                 username: user.username,
@@ -93,106 +169,21 @@ exports.router.post("/register", fileMiddleware_1.fileUpload.diskLoader.single("
         res.status(500).json({ error: "Internal Server Error" });
     }
 }));
-//delete
-exports.router.delete("/:id", verifyToken_1.verifyToken, (0, authorize_1.authorizeRole)(["admin"]), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const id = +req.params.id;
-        // 1️⃣ ดึงชื่อไฟล์จาก DB ก่อน
-        const [rows] = yield dbconnect_1.conn.query("SELECT profile FROM `users` WHERE uid = ?", [id]);
-        const user = rows[0];
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        // 2️⃣ ลบ record จาก DB
-        const [result] = yield dbconnect_1.conn.query("DELETE FROM `users` WHERE uid = ?", [
-            id,
-        ]);
-        const info = result;
-        // 3️⃣ ลบไฟล์จริง โดยเรียก method จาก fileMiddleware
-        if (user.profile) {
-            fileMiddleware_1.fileUpload.deleteFile(user.profile);
-        }
-        res.status(200).json({ affected_row: info.affectedRows });
-    }
-    catch (err) {
-        console.error("DELETE /user error:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-}));
-exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file"), // ✅ รองรับ upload รูปใหม่
-(req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const id = +req.params.id;
-        const user = req.body;
-        // 1️⃣ ดึงข้อมูลผู้ใช้เดิม
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
-        const result = rows;
-        if (result.length === 0) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        const original = result[0];
-        // 2️⃣ ถ้ามีไฟล์ใหม่ อัปเดตชื่อไฟล์ใหม่ และลบไฟล์เก่า
-        let profileFilename = original.profile;
-        if (req.file) {
-            // ลบไฟล์เก่าถ้ามี
-            if (original.profile) {
-                fileMiddleware_1.fileUpload.deleteFile(original.profile);
-            }
-            profileFilename = req.file.filename;
-        }
-        // 3️⃣ ถ้ามีการเปลี่ยนรหัสผ่าน
-        let hashedPassword = original.password;
-        if (user.password) {
-            hashedPassword = yield bcrypt_1.default.hash(user.password, 10);
-        }
-        // 4️⃣ รวมข้อมูลเดิม + ใหม่
-        const update = Object.assign(Object.assign(Object.assign({}, original), user), { password: hashedPassword, profile: profileFilename });
-        // 5️⃣ อัปเดต DB
-        const sql = "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
-        const formattedSql = mysql2_1.default.format(sql, [
-            update.username,
-            update.email,
-            update.password,
-            update.profile,
-            id,
-        ]);
-        const [updateResult] = yield dbconnect_1.conn.query(formattedSql);
-        const info = updateResult;
-        res.status(200).json({
-            affected_row: info.affectedRows,
-            new_profile: update.profile,
-        });
-    }
-    catch (err) {
-        console.error("PUT /user/:id error:", err);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-}));
-//login
+// POST (Login)
 exports.router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { username, password } = req.body;
     try {
-        // 1. ตรวจสอบผู้ใช้
         const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE username = ?", [
             username,
         ]);
         if (rows.length === 0)
             return res.status(401).json({ error: "ไม่พบชื่อผู้ใช้ในระบบ" });
         const user = rows[0];
-        // 2. ตรวจสอบรหัสผ่าน
         const isMatch = yield bcrypt_1.default.compare(password, user.password);
-        console.log("match:", isMatch);
         if (!isMatch)
             return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
-        // 3. สร้าง JWT payload
-        const payload = {
-            uid: user.uid,
-            username: user.username,
-            role: user.role, // สำคัญสำหรับแยกสิทธิ์
-        };
-        // 4. สร้าง token
+        const payload = { uid: user.uid, username: user.username, role: user.role };
         const token = (0, jwtauth_1.generateToken)(payload, jwtauth_1.secret);
-        // 5. ส่ง response
         res.json({
             message: "เข้าสู่ระบบสำเร็จ",
             token,
@@ -207,6 +198,62 @@ exports.router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
     catch (err) {
         console.error("Login error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}));
+// PUT (Edit) a user
+exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = req.params.id;
+        const userUpdate = req.body;
+        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
+        const originalUser = rows[0];
+        if (!originalUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        let profileFilename = originalUser.profile;
+        if (req.file) {
+            if (originalUser.profile) {
+                fileMiddleware_1.fileUpload.deleteFile(originalUser.profile);
+            }
+            profileFilename = req.file.filename;
+        }
+        let hashedPassword = originalUser.password;
+        if (userUpdate.password) {
+            hashedPassword = yield bcrypt_1.default.hash(userUpdate.password, 10);
+        }
+        const sql = "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
+        yield dbconnect_1.conn.query(sql, [
+            userUpdate.username || originalUser.username,
+            userUpdate.email || originalUser.email,
+            hashedPassword,
+            profileFilename,
+            id,
+        ]);
+        res.status(200).json({ message: "User updated successfully" });
+    }
+    catch (err) {
+        console.error("PUT /user/:id error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}));
+// DELETE a user
+exports.router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = req.params.id;
+        const [rows] = yield dbconnect_1.conn.query("SELECT profile FROM `users` WHERE uid = ?", [id]);
+        const user = rows[0];
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        yield dbconnect_1.conn.query("DELETE FROM `users` WHERE uid = ?", [id]);
+        if (user.profile) {
+            fileMiddleware_1.fileUpload.deleteFile(user.profile);
+        }
+        res.status(200).json({ message: "User deleted successfully" });
+    }
+    catch (err) {
+        console.error("DELETE /user error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 }));
