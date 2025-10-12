@@ -19,7 +19,7 @@ router.get("/", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Cannot read users data" });
   }
-});
+}); 
 
 // --- Wallet & Transaction Routes ---
 
