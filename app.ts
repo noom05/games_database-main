@@ -29,6 +29,7 @@ app.use(
       "/user/login",      // ยกเว้นหน้า Login
       "/user/register",   // ยกเว้นหน้า Register
       "/testtoken",       // ยกเว้นหน้า Test Token
+      "/games/types", // ยกเว้นหน้า /games/types
       { url: /^\/games(\/.*)?$/, methods: ['GET'] } 
     ],
   }),
@@ -47,8 +48,8 @@ app.use("/testtoken", (req, res) => {
   res.status(200).json({ token: jwttoken });
 });
 
-app.use(bodyParser.text());
 app.use(bodyParser.json());
+app.use(bodyParser.text()); // ถ้าจำเป็นต้องใช้ text
 app.use("/", index);
 app.use("/user", user);
 app.use("/games", games);

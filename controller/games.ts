@@ -32,10 +32,25 @@ router.get("/", async (req, res) => {
   }
 });
 
+// get all game types
+router.get("/types", async (req, res) => {
+  console.log("GET /games/types headers:", req.headers);
+  try {
+    const [rows] = await conn.query("SELECT * FROM types");
+    res.status(200).json(rows);
+  } catch (err: any) {
+    console.error("❌ GET /games/types error:", err.message);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
+  }
+});
+
 // get game by id
 router.get("/:id", async (req, res) => {
   try {
-    const id = +req.params.id;
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid game ID" });
+    }
 
     // ดึงเกมพร้อมประเภท
     const [rows] = await conn.query(
@@ -116,7 +131,8 @@ router.post(
   fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
   async (req, res) => {
     try {
-      const { game_name, price, description, release_date, type_ids } = req.body;
+      const { game_name, price, description, release_date, type_ids } =
+        req.body;
       // type_ids ควรเป็น array ของ type_id เช่น [1,2,3,4,5]
       const imageFilename = req.file ? req.file.filename : null;
 
@@ -169,10 +185,9 @@ router.delete("/:id", async (req, res) => {
     const id = +req.params.id;
 
     // 1️⃣ ดึงชื่อไฟล์จาก DB ก่อน
-    const [rows] = await conn.query(
-      "SELECT image FROM games WHERE id = ?",
-      [id]
-    );
+    const [rows] = await conn.query("SELECT image FROM games WHERE id = ?", [
+      id,
+    ]);
     const game = (rows as any[])[0];
 
     if (!game) {
@@ -188,7 +203,9 @@ router.delete("/:id", async (req, res) => {
       fileUpload.deleteFile(game.image);
     }
 
-    res.status(200).json({ message: "Game deleted", affected_row: info.affectedRows });
+    res
+      .status(200)
+      .json({ message: "Game deleted", affected_row: info.affectedRows });
   } catch (err) {
     console.error("DELETE /games/:id error:", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -202,7 +219,8 @@ router.put(
   async (req, res) => {
     try {
       const id = +req.params.id;
-      const { game_name, price, description, release_date, type_ids } = req.body; // type_ids = array ของ type_id
+      const { game_name, price, description, release_date, type_ids } =
+        req.body; // type_ids = array ของ type_id
 
       // 1️⃣ ดึงข้อมูลเกมเดิม
       const [rows] = await conn.query("SELECT * FROM games WHERE id = ?", [id]);
@@ -247,7 +265,9 @@ router.put(
         await conn.query("DELETE FROM game_type WHERE game_id = ?", [id]);
         // เพิ่มใหม่
         const values = type_ids.map((typeId: number) => [id, typeId]);
-        await conn.query("INSERT INTO game_type (game_id, type_id) VALUES ?", [values]);
+        await conn.query("INSERT INTO game_type (game_id, type_id) VALUES ?", [
+          values,
+        ]);
       }
 
       res.status(200).json({
