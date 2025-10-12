@@ -131,15 +131,22 @@ router.post(
   fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
   async (req, res) => {
     try {
-      const { game_name, price, description, type_ids } =
-        req.body;
+      const { game_name, price, description } = req.body;
       const imageFilename = req.file ? req.file.filename : null;
 
+      // 🔧 แปลง type_ids จาก JSON string เป็น array
+      let type_ids: number[] = [];
+      try {
+        type_ids = JSON.parse(req.body.type_ids);
+      } catch (e) {
+        console.warn("⚠️ ไม่สามารถแปลง type_ids ได้:", req.body.type_ids);
+      }
+
       const now = new Date();
-        const year = now.getFullYear();
-        const month = ('0' + (now.getMonth() + 1)).slice(-2);
-        const day = ('0' + now.getDate()).slice(-2);
-        const currentDate = `${year}-${month}-${day}`;
+      const year = now.getFullYear();
+      const month = ('0' + (now.getMonth() + 1)).slice(-2);
+      const day = ('0' + now.getDate()).slice(-2);
+      const currentDate = `${year}-${month}-${day}`;
 
       // 1️⃣ เพิ่มเกมลงตาราง games
       const sqlGame = `
@@ -158,7 +165,7 @@ router.post(
       const gameId = (result as mysql.ResultSetHeader).insertId;
 
       // 2️⃣ เพิ่มประเภทเกมลง game_type
-      if (type_ids && Array.isArray(type_ids)) {
+      if (Array.isArray(type_ids) && type_ids.length > 0) {
         const values = type_ids.map((typeId: number) => [gameId, typeId]);
         const sqlTypes = "INSERT INTO game_type (game_id, type_id) VALUES ?";
         await conn.query(sqlTypes, [values]);
@@ -173,14 +180,16 @@ router.post(
           price,
           description,
           image: imageFilename,
+          type_ids
         },
       });
-    } catch (err) {
-      console.error("POST /games error:", err);
-      res.status(500).json({ error: "Internal Server Error" });
+    } catch (err: any) {
+      console.error("❌ POST /games error:", err.message);
+      res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message });
     }
   }
 );
+
 
 // delete game by id
 router.delete("/:id", async (req, res) => {
