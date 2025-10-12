@@ -131,10 +131,15 @@ router.post(
   fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
   async (req, res) => {
     try {
-      const { game_name, price, description, release_date, type_ids } =
+      const { game_name, price, description, type_ids } =
         req.body;
-      // type_ids ควรเป็น array ของ type_id เช่น [1,2,3,4,5]
       const imageFilename = req.file ? req.file.filename : null;
+
+      const now = new Date();
+        const year = now.getFullYear();
+        const month = ('0' + (now.getMonth() + 1)).slice(-2);
+        const day = ('0' + now.getDate()).slice(-2);
+        const currentDate = `${year}-${month}-${day}`;
 
       // 1️⃣ เพิ่มเกมลงตาราง games
       const sqlGame = `
@@ -146,7 +151,7 @@ router.post(
         price,
         imageFilename,
         description,
-        release_date,
+        currentDate
       ]);
 
       const [result] = await conn.query(formattedSqlGame);
@@ -167,9 +172,7 @@ router.post(
           game_name,
           price,
           description,
-          release_date,
           image: imageFilename,
-          type_ids,
         },
       });
     } catch (err) {
