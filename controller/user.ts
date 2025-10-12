@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 import { fileUpload } from "../middleware/fileMiddleware";
 import { generateToken, secret } from "../auth/jwtauth";
 
+import cloudinary from "../cloudinary";
+import fs from "fs";
+
 export const router = express.Router();
 
 // --- User Management Routes ---
@@ -263,17 +266,15 @@ router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
 
     const [rows] = await conn.query("SELECT * FROM users WHERE uid = ?", [id]);
     const originalUser = (rows as any[])[0];
+    if (!originalUser) return res.status(404).json({ message: "User not found" });
 
-    if (!originalUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    let profileFilename = originalUser.profile;
+    let profileUrl = originalUser.profile;
     if (req.file) {
-      if (originalUser.profile) {
-        fileUpload.deleteFile(originalUser.profile);
-      }
-      profileFilename = req.file.filename;
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "gamestore/profile"
+      });
+      profileUrl = result.secure_url;
+      fs.unlinkSync(req.file.path);
     }
 
     let hashedPassword = originalUser.password;
@@ -281,13 +282,12 @@ router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
       hashedPassword = await bcrypt.hash(userUpdate.password, 10);
     }
 
-    const sql =
-      "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
+    const sql = "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
     await conn.query(sql, [
       userUpdate.username || originalUser.username,
       userUpdate.email || originalUser.email,
       hashedPassword,
-      profileFilename,
+      profileUrl,
       id,
     ]);
 
@@ -297,6 +297,7 @@ router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 // DELETE a user
 router.delete("/:id", async (req, res) => {

@@ -3,22 +3,23 @@ import path from "path";
 import multer from "multer";
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from "fs";
+import cloudinary from "../cloudinary";
 
 export const router = express.Router();
 
 class FileMiddleware {
   filename = "";
 	constructor() {
-    const uploadsDir = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
+    // const uploadsDir = path.join(__dirname, "../uploads");
+    // if (!fs.existsSync(uploadsDir)) {
+    //   fs.mkdirSync(uploadsDir, { recursive: true });
+    // }
   }
   public readonly diskLoader = multer({
     storage: multer.diskStorage({
       // Set the destination folder for the uploaded files
       destination: (_req, _file, cb) => {
-        cb(null, path.join(__dirname, "../uploads"));
+        cb(null, path.join(__dirname, "../temp"));
       },
       // Set the unique filename for the uploaded file
       filename: (req, file, cb) => {
