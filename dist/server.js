@@ -1,23 +1,58 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const path_1 = __importDefault(require("path"));
-const url_1 = require("url");
-const user_1 = require("./controller/user");
-const games_1 = require("./controller/games");
-const app = (0, express_1.default)();
-const PORT = process.env.PORT || 3000;
-const __filename = (0, url_1.fileURLToPath)(import.meta.url);
-const __dirname = path_1.default.dirname(__filename);
-app.use(express_1.default.json());
-app.use("/user", user_1.router);
-app.use("/games", games_1.router);
-// ✅ เสิร์ฟ Angular frontend
-app.use(express_1.default.static(path_1.default.join(__dirname, "dist/frontend")));
-app.get("*", (req, res) => {
-    res.sendFile(path_1.default.join(__dirname, "dist/frontend/index.html"));
+const app_1 = require("./app");
+const os = __importStar(require("os"));
+const port = process.env.port || 3000;
+app_1.app.use(express_1.default.json());
+const ip = (() => {
+    let address = "0.0.0.0";
+    const interfaces = os.networkInterfaces();
+    Object.keys(interfaces).forEach((interfaceName) => {
+        interfaces[interfaceName]?.forEach((interfaceInfo) => {
+            if (interfaceInfo.family === "IPv4" && !interfaceInfo.internal) {
+                address = interfaceInfo.address;
+            }
+        });
+    });
+    return address;
+})();
+app_1.app.listen(port, () => {
+    console.log(`Games API listening at http://${ip}:${port}`);
 });
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
