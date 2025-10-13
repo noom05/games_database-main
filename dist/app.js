@@ -4,46 +4,50 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.app = void 0;
+// app.ts (เฉพาะส่วนที่เปลี่ยน)
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const index_1 = require("./controller/index");
-const user_1 = require("./controller/user");
-const games_1 = require("./controller/games");
-const body_parser_1 = __importDefault(require("body-parser"));
 const path_1 = __importDefault(require("path"));
+const body_parser_1 = __importDefault(require("body-parser"));
 const jwtauth_1 = require("./auth/jwtauth");
-exports.app = (0, express_1.default)();
-exports.app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
-exports.app.use((0, cors_1.default)({
+const app = (0, express_1.default)();
+exports.app = app;
+// 1) Body parser ก่อนจะใช้ route / middleware อื่นๆ
+app.use(body_parser_1.default.json());
+app.use(body_parser_1.default.text());
+// 2) Serve views / static ก่อน jwt middleware
+app.use(express_1.default.static(path_1.default.join(__dirname, "views")));
+app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
+app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
+// 3) CORS
+app.use((0, cors_1.default)({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
-exports.app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "uploads")));
-exports.app.use("/assets", express_1.default.static(path_1.default.join(__dirname, "assets")));
-// เราจะใช้ .unless() เพื่อบอกว่า Middleware นี้จะไม่ทำงานกับ path ที่ระบุไว้
-exports.app.use(jwtauth_1.jwtAuthen.unless({
+// 4) ลง jwtAuthen และระบุ path ที่ยกเว้นให้ครอบคลุม /uploads
+app.use(jwtauth_1.jwtAuthen.unless({
     path: [
-        "/user/login", // ยกเว้นหน้า Login
-        "/user/register", // ยกเว้นหน้า Register
-        "/testtoken", // ยกเว้นหน้า Test Token
-        "/games/types", // ยกเว้นหน้า /games/types
-        { url: /^\/games(\/.*)?$/, methods: ['GET'] }
+        "/user/login",
+        "/user/register",
+        "/testtoken",
+        "/games/types",
+        "/uploads", // ยกเว้น root uploads
+        { url: /^\/uploads\/.*/, methods: ["GET"] }, // ยกเว้นไฟล์ภายใน uploads
+        { url: /^\/games(\/.*)?$/, methods: ["GET"] } // ยกเว้น GET /games and subpaths
     ],
-}), (err, req, res, next) => {
-    if (err.name === "UnauthorizedError") {
-        res.status(err.status).send({ message: err.message });
-        return;
+}));
+// 5) แยก error-handler สำหรับ UnauthorizedError
+app.use((err, _req, res, next) => {
+    if (err && err.name === "UnauthorizedError") {
+        return res.status(err.status || 401).json({ message: err.message || "Unauthorized" });
     }
-    next();
+    next(err);
 });
-exports.app.use("/testtoken", (req, res) => {
-    const payload = { username: "siriwat" };
-    const jwttoken = (0, jwtauth_1.generateToken)(payload, jwtauth_1.secret);
-    res.status(200).json({ token: jwttoken });
-});
-exports.app.use(body_parser_1.default.json());
-exports.app.use(body_parser_1.default.text()); // ถ้าจำเป็นต้องใช้ text
-exports.app.use("/", index_1.router);
-exports.app.use("/user", user_1.router);
-exports.app.use("/games", games_1.router);
+// 6) Routes (ลงหลัง middleware)
+const index_1 = require("./controller/index");
+const user_1 = require("./controller/user");
+const games_1 = require("./controller/games");
+app.use("/", index_1.router);
+app.use("/user", user_1.router);
+app.use("/games", games_1.router);

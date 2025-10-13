@@ -123,17 +123,19 @@ exports.router.get("/type/:typeId", (req, res) => __awaiter(void 0, void 0, void
     }
 }));
 // add new game
-exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
-(req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { game_name, price, description, type_ids } = req.body;
+        const { game_name, price, description } = req.body;
         const imageFilename = req.file ? req.file.filename : null;
+        let type_ids = [];
+        try {
+            type_ids = req.body.type_ids ? JSON.parse(req.body.type_ids) : [];
+        }
+        catch (e) {
+            console.warn("⚠️ ไม่สามารถแปลง type_ids ได้:", req.body.type_ids);
+        }
         const now = new Date();
-        const year = now.getFullYear();
-        const month = ('0' + (now.getMonth() + 1)).slice(-2);
-        const day = ('0' + now.getDate()).slice(-2);
-        const currentDate = `${year}-${month}-${day}`;
-        // 1️⃣ เพิ่มเกมลงตาราง games
+        const currentDate = `${now.getFullYear()}-${("0" + (now.getMonth() + 1)).slice(-2)}-${("0" + now.getDate()).slice(-2)}`;
         const sqlGame = `
         INSERT INTO games (game_name, price, image, description, release_date, total_sales)
         VALUES (?, ?, ?, ?, ?, 0)
@@ -147,13 +149,11 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
         ]);
         const [result] = yield dbconnect_1.conn.query(formattedSqlGame);
         const gameId = result.insertId;
-        // 2️⃣ เพิ่มประเภทเกมลง game_type
-        if (type_ids && Array.isArray(type_ids)) {
+        if (Array.isArray(type_ids) && type_ids.length > 0) {
             const values = type_ids.map((typeId) => [gameId, typeId]);
             const sqlTypes = "INSERT INTO game_type (game_id, type_id) VALUES ?";
             yield dbconnect_1.conn.query(sqlTypes, [values]);
         }
-        // 3️⃣ ส่ง response
         res.status(201).json({
             message: "เพิ่มเกมสำเร็จ",
             game: {
@@ -162,12 +162,13 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
                 price,
                 description,
                 image: imageFilename,
+                type_ids
             },
         });
     }
     catch (err) {
-        console.error("POST /games error:", err);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("❌ POST /games error:", err);
+        res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message || err });
     }
 }));
 // delete game by id

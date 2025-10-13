@@ -128,27 +128,22 @@ router.get("/type/:typeId", async (req, res) => {
 // add new game
 router.post(
   "/",
-  fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
+  fileUpload.diskLoader.single("file"),
   async (req, res) => {
     try {
       const { game_name, price, description } = req.body;
       const imageFilename = req.file ? req.file.filename : null;
 
-      // 🔧 แปลง type_ids จาก JSON string เป็น array
       let type_ids: number[] = [];
       try {
-        type_ids = JSON.parse(req.body.type_ids);
+        type_ids = req.body.type_ids ? JSON.parse(req.body.type_ids) : [];
       } catch (e) {
         console.warn("⚠️ ไม่สามารถแปลง type_ids ได้:", req.body.type_ids);
       }
 
       const now = new Date();
-      const year = now.getFullYear();
-      const month = ('0' + (now.getMonth() + 1)).slice(-2);
-      const day = ('0' + now.getDate()).slice(-2);
-      const currentDate = `${year}-${month}-${day}`;
+      const currentDate = `${now.getFullYear()}-${("0" + (now.getMonth() + 1)).slice(-2)}-${("0" + now.getDate()).slice(-2)}`;
 
-      // 1️⃣ เพิ่มเกมลงตาราง games
       const sqlGame = `
         INSERT INTO games (game_name, price, image, description, release_date, total_sales)
         VALUES (?, ?, ?, ?, ?, 0)
@@ -164,14 +159,12 @@ router.post(
       const [result] = await conn.query(formattedSqlGame);
       const gameId = (result as mysql.ResultSetHeader).insertId;
 
-      // 2️⃣ เพิ่มประเภทเกมลง game_type
       if (Array.isArray(type_ids) && type_ids.length > 0) {
         const values = type_ids.map((typeId: number) => [gameId, typeId]);
         const sqlTypes = "INSERT INTO game_type (game_id, type_id) VALUES ?";
         await conn.query(sqlTypes, [values]);
       }
 
-      // 3️⃣ ส่ง response
       res.status(201).json({
         message: "เพิ่มเกมสำเร็จ",
         game: {
@@ -184,12 +177,11 @@ router.post(
         },
       });
     } catch (err: any) {
-      console.error("❌ POST /games error:", err.message);
-      res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message });
+      console.error("❌ POST /games error:", err);
+      res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message || err });
     }
   }
 );
-
 
 // delete game by id
 router.delete("/:id", async (req, res) => {

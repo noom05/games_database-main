@@ -18,6 +18,8 @@ const dbconnect_1 = require("../db/dbconnect");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const fileMiddleware_1 = require("../middleware/fileMiddleware");
 const jwtauth_1 = require("../auth/jwtauth");
+const cloudinary_1 = __importDefault(require("../cloudinary"));
+const fs_1 = __importDefault(require("fs"));
 exports.router = express_1.default.Router();
 // --- User Management Routes ---
 // GET all users
@@ -208,15 +210,15 @@ exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file")
         const userUpdate = req.body;
         const [rows] = yield dbconnect_1.conn.query("SELECT * FROM users WHERE uid = ?", [id]);
         const originalUser = rows[0];
-        if (!originalUser) {
+        if (!originalUser)
             return res.status(404).json({ message: "User not found" });
-        }
-        let profileFilename = originalUser.profile;
+        let profileUrl = originalUser.profile;
         if (req.file) {
-            if (originalUser.profile) {
-                fileMiddleware_1.fileUpload.deleteFile(originalUser.profile);
-            }
-            profileFilename = req.file.filename;
+            const result = yield cloudinary_1.default.uploader.upload(req.file.path, {
+                folder: "gamestore/profile"
+            });
+            profileUrl = result.secure_url;
+            fs_1.default.unlinkSync(req.file.path);
         }
         let hashedPassword = originalUser.password;
         if (userUpdate.password) {
@@ -227,7 +229,7 @@ exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file")
             userUpdate.username || originalUser.username,
             userUpdate.email || originalUser.email,
             hashedPassword,
-            profileFilename,
+            profileUrl,
             id,
         ]);
         res.status(200).json({ message: "User updated successfully" });

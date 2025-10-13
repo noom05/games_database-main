@@ -1,3 +1,6 @@
-node_modules
-env
+
 .env
+/generated/prisma
+node_modules/
+dist/
+uploads/

@@ -1,18 +1,22 @@
+// app.ts (เฉพาะส่วนที่เปลี่ยน)
 import express from "express";
 import cors from "cors";
-import { router as index } from "./controller/index";
-import { router as user } from "./controller/user";
-import { router as games } from "./controller/games";
-
-import bodyParser from "body-parser";
 import path from "path";
-import { generateToken, jwtAuthen, secret } from "./auth/jwtauth";
+import bodyParser from "body-parser";
+import { jwtAuthen } from "./auth/jwtauth";
 
-export const app = express();
+const app = express();
 
+// 1) Body parser ก่อนจะใช้ route / middleware อื่นๆ
+app.use(bodyParser.json());
+app.use(bodyParser.text());
 
+// 2) Serve views / static ก่อน jwt middleware
 app.use(express.static(path.join(__dirname, "views")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/assets", express.static(path.join(__dirname, "assets")));
 
+// 3) CORS
 app.use(
   cors({
     origin: "*",
@@ -20,36 +24,37 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/assets", express.static(path.join(__dirname, "assets")));
-// เราจะใช้ .unless() เพื่อบอกว่า Middleware นี้จะไม่ทำงานกับ path ที่ระบุไว้
+
+// 4) ลง jwtAuthen และระบุ path ที่ยกเว้นให้ครอบคลุม /uploads
 app.use(
   jwtAuthen.unless({
     path: [
-      "/user/login",      // ยกเว้นหน้า Login
-      "/user/register",   // ยกเว้นหน้า Register
-      "/testtoken",       // ยกเว้นหน้า Test Token
-      "/games/types", // ยกเว้นหน้า /games/types
-      { url: /^\/games(\/.*)?$/, methods: ['GET'] } 
+      "/user/login",
+      "/user/register",
+      "/testtoken",
+      "/games/types",
+      "/uploads",               // ยกเว้น root uploads
+      { url: /^\/uploads\/.*/, methods: ["GET"] }, // ยกเว้นไฟล์ภายใน uploads
+      { url: /^\/games(\/.*)?$/, methods: ["GET"] } // ยกเว้น GET /games and subpaths
     ],
-  }),
-  (err: any, req: any, res: any, next: any) => {
-    if (err.name === "UnauthorizedError") {
-      res.status(err.status).send({ message: err.message });
-      return;
-    }
-    next();
-  }
+  })
 );
 
-app.use("/testtoken", (req, res) => {
-  const payload: any = { username: "siriwat" };
-  const jwttoken = generateToken(payload, secret);
-  res.status(200).json({ token: jwttoken });
+// 5) แยก error-handler สำหรับ UnauthorizedError
+app.use((err: any, _req: any, res: any, next: any) => {
+  if (err && err.name === "UnauthorizedError") {
+    return res.status(err.status || 401).json({ message: err.message || "Unauthorized" });
+  }
+  next(err);
 });
 
-app.use(bodyParser.json());
-app.use(bodyParser.text()); // ถ้าจำเป็นต้องใช้ text
+// 6) Routes (ลงหลัง middleware)
+import { router as index } from "./controller/index";
+import { router as user } from "./controller/user";
+import { router as games } from "./controller/games";
+
 app.use("/", index);
 app.use("/user", user);
 app.use("/games", games);
+
+export { app };
