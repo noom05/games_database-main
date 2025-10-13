@@ -1,26 +1,24 @@
-import express, { Response } from "express";
-import { app } from "./app";
-import * as os from "os";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { router as user } from "./controller/user";
+import { router as games } from "./controller/games";
 
-const port = process.env.port || 3000;
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(express.json());
+app.use("/user", user);
+app.use("/games", games);
 
-const ip: string = (() => {
-    let address = "0.0.0.0";
-    const interfaces = os.networkInterfaces();
+// ✅ เสิร์ฟ Angular frontend
+app.use(express.static(path.join(__dirname, "dist/frontend")));
 
-    Object.keys(interfaces).forEach((interfaceName) => {
-        interfaces[interfaceName]?.forEach((interfaceInfo) => {
-            if (interfaceInfo.family === "IPv4" && !interfaceInfo.internal) {
-                address = interfaceInfo.address;
-            }
-        });
-    });
-
-    return address;
-})();
-
-app.listen(port, () => {
-    console.log(`Games API listening at http://${ip}:${port}`);
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist/frontend/index.html"));
 });
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
