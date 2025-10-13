@@ -2,5 +2,5 @@
 .env
 /generated/prisma
 node_modules/
-dist/
+# dist/
 # uploads/
