@@ -3,4 +3,4 @@
 /generated/prisma
 node_modules/
 dist/
-uploads/
+# uploads/
