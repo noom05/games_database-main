@@ -142,6 +142,47 @@ router.post("/wallet/purchase", async (req, res) => {
   }
 });
 
+//get game purchase by user_id and game_id
+router.get("/game/:gameId/detail", async (req, res) => {
+  const gameId = +req.params.gameId;
+
+  if (!req.query.userId) {
+    return res.status(400).json({ error: "userId is required" });
+  }
+  const userId = +req.query.userId;
+
+  try {
+    // ดึงข้อมูลเกม
+    const [gameRows] = await conn.query<RowDataPacket[]>(
+      'SELECT * FROM games WHERE id = ?',
+      [gameId]
+    );
+
+    if (gameRows.length === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    // ตรวจสอบว่าผู้ใช้ซื้อเกมนี้แล้วหรือยัง
+    const [purchaseRows] = await conn.query<RowDataPacket[]>(
+      `SELECT * FROM transaction 
+       WHERE user_id = ? AND game_id = ? AND type = 'purchase'`,
+      [userId, gameId]
+    );
+
+    const isPurchased = purchaseRows.length > 0;
+
+    // ส่งข้อมูลทั้งหมด
+    res.json({
+      game: gameRows[0],
+      isPurchased
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // GET User's Transaction History
 router.get("/history/:id", async (req, res) => {
   const userId = req.params.id;
