@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import { fileUpload } from "../middleware/fileMiddleware";
 import { generateToken, secret } from "../auth/jwtauth";
 
-import cloudinary from "../cloudinary";
+// import cloudinary from "../cloudinary";
 import fs from "fs";
 
 export const router = express.Router();
@@ -261,43 +261,85 @@ router.post("/login", async (req, res) => {
 // PUT (Edit) a user
 router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
   try {
-    const id = req.params.id;
-    const userUpdate: Partial<Users> = req.body;
+    const id = +req.params.id;
+    // req.body มาจาก multipart -> ค่าเป็น string
+    const { username, email, password } = req.body as {
+      username?: string;
+      email?: string;
+      password?: string;
+    };
 
+    // ดึง user เดิม
     const [rows] = await conn.query("SELECT * FROM users WHERE uid = ?", [id]);
-    const originalUser = (rows as any[])[0];
-    if (!originalUser) return res.status(404).json({ message: "User not found" });
+    const result = rows as any[];
+    if (result.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const original = result[0];
 
-    let profileUrl = originalUser.profile;
+    // logging ชั่วคราวสำหรับดีบัก
+    console.log("PUT /user/:id - id:", id);
+    console.log("PUT /user/:id - body keys:", Object.keys(req.body || {}));
+    console.log(
+      "PUT /user/:id - file:",
+      !!req.file,
+      req.file ? { filename: (req.file as any).filename } : null
+    );
+
+    // จัดการไฟล์ใหม่ (ถ้ามี) และลบไฟล์เก่าใน /uploads ถ้าเป็นไฟล์ภายในระบบ
+    let profileFilename = original.profile; // เก็บค่าปัจจุบัน
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "gamestore/profile"
-      });
-      profileUrl = result.secure_url;
-      fs.unlinkSync(req.file.path);
+      // multer เก็บ filename ใน req.file.filename ตาม config ของคุณ
+      const newFilename = (req.file as any).filename;
+      profileFilename = `/uploads/${newFilename}`;
+
+      // ลบไฟล์เก่า ถ้า original.profile เป็น /uploads/<file>
+      try {
+        if (
+          original.profile &&
+          typeof original.profile === "string" &&
+          original.profile.startsWith("/uploads/")
+        ) {
+          const oldFilename = original.profile.replace(/^\/uploads\//, "");
+          fileUpload.deleteFile(oldFilename);
+        }
+      } catch (e) {
+        console.warn("Could not delete old profile file:", e);
+      }
     }
 
-    let hashedPassword = originalUser.password;
-    if (userUpdate.password) {
-      hashedPassword = await bcrypt.hash(userUpdate.password, 10);
+    // password handling: ถ้ามี password ใหม่และไม่ว่าง ให้ hash
+    let hashedPassword = original.password;
+    if (typeof password === "string" && password.trim() !== "") {
+      hashedPassword = await bcrypt.hash(password, 10);
     }
 
-    const sql = "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
+    // อัปเดตข้อมูลในฐานข้อมูล
+    const sql =
+      "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
     await conn.query(sql, [
-      userUpdate.username || originalUser.username,
-      userUpdate.email || originalUser.email,
+      username || original.username,
+      email || original.email,
       hashedPassword,
-      profileUrl,
+      profileFilename,
       id,
     ]);
 
-    res.status(200).json({ message: "User updated successfully" });
+    // ดึงข้อมูลใหม่กลับมาและคืนค่าให้ client
+    const [newRows] = await conn.query(
+      "SELECT uid, username, email, profile FROM users WHERE uid = ?",
+      [id]
+    );
+    const updatedUser = (newRows as any[])[0];
+
+    return res
+      .status(200)
+      .json({ message: "User updated successfully", user: updatedUser });
   } catch (err) {
     console.error("PUT /user/:id error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 // DELETE a user
 router.delete("/:id", async (req, res) => {
