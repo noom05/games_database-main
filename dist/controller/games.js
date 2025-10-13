@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -19,9 +10,9 @@ const mysql2_1 = __importDefault(require("mysql2"));
 const fileMiddleware_1 = require("../middleware/fileMiddleware");
 exports.router = express_1.default.Router();
 // get all games with their categories
-exports.router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/", async (req, res) => {
     try {
-        const [rows] = yield dbconnect_1.conn.query(`
+        const [rows] = await dbconnect_1.conn.query(`
       SELECT 
         g.id,
         g.game_name,
@@ -42,28 +33,28 @@ exports.router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error(err);
         res.status(500).json({ error: "Cannot read games data" });
     }
-}));
+});
 // get all game types
-exports.router.get("/types", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/types", async (req, res) => {
     console.log("GET /games/types headers:", req.headers);
     try {
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM types");
+        const [rows] = await dbconnect_1.conn.query("SELECT * FROM types");
         res.status(200).json(rows);
     }
     catch (err) {
         console.error("❌ GET /games/types error:", err.message);
         res.status(500).json({ error: err.message || "Internal Server Error" });
     }
-}));
+});
 // get game by id
-exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/:id", async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (isNaN(id)) {
             return res.status(400).json({ error: "Invalid game ID" });
         }
         // ดึงเกมพร้อมประเภท
-        const [rows] = yield dbconnect_1.conn.query(`
+        const [rows] = await dbconnect_1.conn.query(`
       SELECT 
         g.id,
         g.game_name,
@@ -90,12 +81,12 @@ exports.router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, funct
         console.error("GET /games/:id error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
-}));
+});
 // get games by type
-exports.router.get("/type/:typeId", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.get("/type/:typeId", async (req, res) => {
     try {
         const typeId = +req.params.typeId;
-        const [rows] = yield dbconnect_1.conn.query(`
+        const [rows] = await dbconnect_1.conn.query(`
       SELECT 
         g.id,
         g.game_name,
@@ -121,9 +112,9 @@ exports.router.get("/type/:typeId", (req, res) => __awaiter(void 0, void 0, void
         console.error("GET /games/type/:typeId error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
-}));
+});
 // add new game
-exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), async (req, res) => {
     try {
         const { game_name, price, description } = req.body;
         const imageFilename = req.file ? req.file.filename : null;
@@ -147,12 +138,12 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
             description,
             currentDate
         ]);
-        const [result] = yield dbconnect_1.conn.query(formattedSqlGame);
+        const [result] = await dbconnect_1.conn.query(formattedSqlGame);
         const gameId = result.insertId;
         if (Array.isArray(type_ids) && type_ids.length > 0) {
             const values = type_ids.map((typeId) => [gameId, typeId]);
             const sqlTypes = "INSERT INTO game_type (game_id, type_id) VALUES ?";
-            yield dbconnect_1.conn.query(sqlTypes, [values]);
+            await dbconnect_1.conn.query(sqlTypes, [values]);
         }
         res.status(201).json({
             message: "เพิ่มเกมสำเร็จ",
@@ -170,13 +161,13 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
         console.error("❌ POST /games error:", err);
         res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message || err });
     }
-}));
+});
 // delete game by id
-exports.router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.router.delete("/:id", async (req, res) => {
     try {
         const id = +req.params.id;
         // 1️⃣ ดึงชื่อไฟล์จาก DB ก่อน
-        const [rows] = yield dbconnect_1.conn.query("SELECT image FROM games WHERE id = ?", [
+        const [rows] = await dbconnect_1.conn.query("SELECT image FROM games WHERE id = ?", [
             id,
         ]);
         const game = rows[0];
@@ -184,7 +175,7 @@ exports.router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, fu
             return res.status(404).json({ message: "Game not found" });
         }
         // 2️⃣ ลบ record จาก DB
-        const [result] = yield dbconnect_1.conn.query("DELETE FROM games WHERE id = ?", [id]);
+        const [result] = await dbconnect_1.conn.query("DELETE FROM games WHERE id = ?", [id]);
         const info = result;
         // 3️⃣ ลบไฟล์จริง
         if (game.image) {
@@ -198,15 +189,15 @@ exports.router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, fu
         console.error("DELETE /games/:id error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
-}));
+});
 // edit game by id
 exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file"), // รองรับ upload รูปใหม่
-(req, res) => __awaiter(void 0, void 0, void 0, function* () {
+async (req, res) => {
     try {
         const id = +req.params.id;
         const { game_name, price, description, release_date, type_ids } = req.body; // type_ids = array ของ type_id
         // 1️⃣ ดึงข้อมูลเกมเดิม
-        const [rows] = yield dbconnect_1.conn.query("SELECT * FROM games WHERE id = ?", [id]);
+        const [rows] = await dbconnect_1.conn.query("SELECT * FROM games WHERE id = ?", [id]);
         const result = rows;
         if (result.length === 0) {
             return res.status(404).json({ message: "Game not found" });
@@ -234,15 +225,15 @@ exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file")
             imageFilename,
             id,
         ]);
-        const [updateResult] = yield dbconnect_1.conn.query(formattedSql);
+        const [updateResult] = await dbconnect_1.conn.query(formattedSql);
         const info = updateResult;
         // 4️⃣ อัปเดตประเภทเกม (ลบของเก่าแล้วเพิ่มใหม่)
         if (type_ids && Array.isArray(type_ids)) {
             // ลบของเก่า
-            yield dbconnect_1.conn.query("DELETE FROM game_type WHERE game_id = ?", [id]);
+            await dbconnect_1.conn.query("DELETE FROM game_type WHERE game_id = ?", [id]);
             // เพิ่มใหม่
             const values = type_ids.map((typeId) => [id, typeId]);
-            yield dbconnect_1.conn.query("INSERT INTO game_type (game_id, type_id) VALUES ?", [
+            await dbconnect_1.conn.query("INSERT INTO game_type (game_id, type_id) VALUES ?", [
                 values,
             ]);
         }
@@ -264,4 +255,4 @@ exports.router.put("/:id", fileMiddleware_1.fileUpload.diskLoader.single("file")
         console.error("PUT /games/:id error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
-}));
+});

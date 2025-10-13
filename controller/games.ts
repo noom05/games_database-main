@@ -2,7 +2,7 @@ import express from "express";
 import { conn } from "../db/dbconnect";
 import { Users } from "../model/user";
 import mysql from "mysql2";
-import bcrypt from "bcrypt";
+import bcrypt from "bcrypt";  
 import { fileUpload } from "../middleware/fileMiddleware";
 
 export const router = express.Router();
@@ -128,7 +128,7 @@ router.get("/type/:typeId", async (req, res) => {
 // add new game
 router.post(
   "/",
-  fileUpload.diskLoader.single("file"),
+  fileUpload.diskLoader.single("file"), 
   async (req, res) => {
     try {
       const { game_name, price, description } = req.body;
