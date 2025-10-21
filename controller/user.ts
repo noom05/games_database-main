@@ -79,67 +79,126 @@ router.post("/wallet/topup", async (req, res) => {
   }
 });
 
-// POST Purchase Game
+// POST Purchase Game (ฉบับอัปเดต รองรับส่วนลด)
+// POST /user/wallet/purchase
 router.post("/wallet/purchase", async (req, res) => {
-  const { user_id, game_id } = req.body;
-  const connection = await conn.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    const [gameRows] = await connection.query<RowDataPacket[]>(
-      "SELECT id, game_name, price FROM games WHERE id = ? FOR UPDATE",
-      [game_id]
-    );
-    const [walletRows] = await connection.query<RowDataPacket[]>(
-      "SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE",
-      [user_id]
-    );
-
-    if (gameRows.length === 0) throw new Error("Game not found");
-    if (walletRows.length === 0) throw new Error("Wallet not found");
-
-    const game = gameRows[0];
-    const wallet = walletRows[0];
-
-    const [duplicateCheck] = await connection.query<RowDataPacket[]>(
-      "SELECT id FROM transaction WHERE user_id = ? AND game_id = ? AND type = 'purchase'",
-      [user_id, game_id]
-    );
-    if (duplicateCheck.length > 0) {
-      throw new Error("You already purchased this game");
+    // 1. รับ discount_code เพิ่มจาก body
+    const { user_id, game_id, discount_code } = req.body;
+    
+    if (!user_id || !game_id) {
+        return res.status(400).json({ error: "User ID and Game ID are required." });
     }
 
-    if (wallet.balance < game.price) {
-      throw new Error("Not enough balance");
+    const connection = await conn.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // --- ตัวแปรสำหรับคำนวณราคา ---
+        let original_price = 0;
+        let final_price = 0;
+        let discountCodeData: RowDataPacket | null = null; // เก็บข้อมูลโค้ดที่ใช้
+
+        // 2. ดึงข้อมูลเกม (ล็อคแถว)
+        const [gameRows] = await connection.query<RowDataPacket[]>("SELECT id, game_name, price FROM games WHERE id = ? FOR UPDATE", [game_id]);
+        if (gameRows.length === 0) throw new Error("Game not found");
+        
+        const game = gameRows[0];
+        original_price = game.price;
+        final_price = game.price; // ราคาเริ่มต้น = ราคาเต็ม
+
+        // 3. ดึงข้อมูลกระเป๋าเงิน (ล็อคแถว)
+        const [walletRows] = await connection.query<RowDataPacket[]>("SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE", [user_id]);
+        if (walletRows.length === 0) throw new Error("Wallet not found");
+
+        const wallet = walletRows[0];
+
+        // 4. เช็คว่าเคยซื้อเกมนี้หรือยัง
+        const [duplicateCheck] = await connection.query<RowDataPacket[]>("SELECT id FROM transaction WHERE user_id = ? AND game_id = ? AND type = 'purchase'", [user_id, game_id]);
+        if (duplicateCheck.length > 0) {
+            throw new Error("You already purchased this game");
+        }
+
+        // 5. [LOGIC ใหม่] ตรวจสอบและคำนวณส่วนลด (ถ้ามีโค้ดส่งมา)
+        if (discount_code) {
+            // 5.1 ค้นหาโค้ดและล็อคแถว (สำคัญมากที่ต้อง FOR UPDATE)
+            const [codeRows] = await connection.query<RowDataPacket[]>(
+                "SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE FOR UPDATE",
+                [discount_code.toUpperCase()]
+            );
+            if (codeRows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
+            
+            const code = codeRows[0];
+            discountCodeData = code; // เก็บข้อมูลโค้ดไว้ใช้ตอนจบ
+
+            // 5.2 เช็คเงื่อนไขโค้ด (เหมือนใน /apply)
+            if (code.expiry_date && new Date(code.expiry_date) < new Date()) {
+                throw new Error("โค้ดส่วนลดนี้หมดอายุแล้ว");
+            }
+            if (code.current_uses >= code.max_uses) {
+                throw new Error("โค้ดส่วนลดนี้ถูกใช้เต็มจำนวนแล้ว");
+            }
+
+            // 5.3 เช็คว่าเคยใช้หรือยัง
+            const [usageRows] = await connection.query<RowDataPacket[]>(
+                "SELECT id FROM user_discount_usage WHERE user_id = ? AND code_id = ?",
+                [user_id, code.id]
+            );
+            if (usageRows.length > 0) {
+                throw new Error("คุณใช้โค้ดส่วนลดนี้ไปแล้ว");
+            }
+
+            // 5.4 คำนวณราคาสุดท้าย
+            if (code.discount_type === 'percent') {
+                final_price = original_price - (original_price * (code.discount_value / 100));
+            } else if (code.discount_type === 'fixed') {
+                final_price = original_price - code.discount_value;
+            }
+
+            // ป้องกันราคาติดลบ
+            if (final_price < 0) {
+                final_price = 0;
+            }
+        }
+
+        // 6. [LOGIC แก้ไข] เช็คยอดเงินคงเหลือ เทียบกับ "ราคาสุดท้าย"
+        if (wallet.balance < final_price) {
+            throw new Error("Not enough balance");
+        }
+
+        // 7. [LOGIC แก้ไข] หักเงินออกจาก wallet ด้วย "ราคาสุดท้าย"
+        await connection.query("UPDATE wallet SET balance = balance - ? WHERE user_id = ?", [final_price, user_id]);
+        
+        // 8. [LOGIC แก้ไข] บันทึก transaction ด้วย "ราคาสุดท้าย"
+        await connection.query<ResultSetHeader>("INSERT INTO transaction (user_id, type, amount, game_id) VALUES (?, 'purchase', ?, ?)", [user_id, final_price, game_id]);
+        
+        // 9. [LOGIC ใหม่] อัปเดตตารางส่วนลด (ถ้ามีการใช้งาน)
+        if (discountCodeData) {
+            // 9.1 เพิ่มจำนวนการใช้
+            await connection.query("UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = ?", [discountCodeData.id]);
+            // 9.2 บันทึกว่า User นี้ใช้โค้ดนี้แล้ว
+            await connection.query("INSERT INTO user_discount_usage (user_id, code_id) VALUES (?, ?)", [user_id, discountCodeData.id]);
+        }
+        
+        // 10. ดึงยอดเงินล่าสุด
+        const [updatedWallet] = await connection.query<RowDataPacket[]>("SELECT balance FROM wallet WHERE user_id = ?", [user_id]);
+        
+        // 11. จบ Transaction
+        await connection.commit();
+
+        res.json({
+            message: "Purchase successful",
+            balance: updatedWallet[0].balance,
+        });
+
+    } catch (err: any) {
+        // หากเกิด Error ใดๆ (เช่น เงินไม่พอ, โค้ดผิด) ให้ Rollback ทั้งหมด
+        await connection.rollback();
+        console.error("Purchase failed:", err.message);
+        // ส่ง Error ที่เกิดขึ้นจริงกลับไปให้ Frontend
+        res.status(400).json({ error: err.message });
+    } finally {
+        connection.release();
     }
-
-    await connection.query(
-      "UPDATE wallet SET balance = balance - ? WHERE user_id = ?",
-      [game.price, user_id]
-    );
-
-    const [updatedWallet] = await connection.query<RowDataPacket[]>(
-      "SELECT balance FROM wallet WHERE user_id = ?",
-      [user_id]
-    );
-
-    const [transactionResult] = await connection.query<ResultSetHeader>(
-      "INSERT INTO transaction (user_id, type, amount, game_id) VALUES (?, 'purchase', ?, ?)",
-      [user_id, game.price, game_id]
-    );
-
-    await connection.commit();
-
-    res.json({
-      message: "Purchase successful",
-      balance: updatedWallet[0].balance,
-    });
-  } catch (err: any) {
-    await connection.rollback();
-    res.status(500).json({ error: err.message });
-  } finally {
-    connection.release();
-  }
 });
 
 //get game purchase by user_id and game_id

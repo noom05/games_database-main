@@ -52,9 +52,11 @@ app.use((err: any, _req: any, res: any, next: any) => {
 import { router as index } from "./controller/index";
 import { router as user } from "./controller/user";
 import { router as games } from "./controller/games";
+import { router as discountRouter } from './controller/discount';
 
 app.use("/", index);
 app.use("/user", user);
 app.use("/games", games);
+app.use('/discount', discountRouter);
 
 export { app };
