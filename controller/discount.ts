@@ -58,6 +58,64 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * [GET] /discount/:id
+ * Admin: ดึงข้อมูลโค้ด 1 ตัวเพื่อนำไปแก้ไข
+ */
+// (ควรใส่ adminMiddleware)
+router.get("/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await conn.query<RowDataPacket[]>("SELECT * FROM discount_codes WHERE id = ?", [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Code not found" });
+        }
+        res.json(rows[0]);
+    } catch (err) {
+        console.error("Get code by id error:", err);
+        res.status(500).json({ error: "Failed to get code", detail: err });
+    }
+});
+
+
+/**
+ * [PUT] /discount/:id
+ * Admin: อัปเดตข้อมูลโค้ดส่วนลด
+ */
+// (ควรใส่ adminMiddleware)
+router.put("/:id", async (req, res) => {
+    const { id } = req.params;
+    const { discount_type, discount_value, max_uses, expiry_date, is_active } = req.body;
+
+    if (!discount_type || !discount_value || !max_uses) {
+        return res.status(400).json({ error: "Type, value, and max_uses are required." });
+    }
+
+    try {
+        const sql = `
+            UPDATE discount_codes 
+            SET discount_type = ?, discount_value = ?, max_uses = ?, expiry_date = ?, is_active = ?
+            WHERE id = ?
+        `;
+        const [result] = await conn.query<ResultSetHeader>(sql, [
+            discount_type,
+            discount_value,
+            max_uses,
+            expiry_date || null,
+            is_active,
+            id
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Code not found" });
+        }
+        res.json({ message: "Discount code updated successfully" });
+    } catch (err) {
+        console.error("Update discount error:", err);
+        res.status(500).json({ error: "Failed to update code", detail: err });
+    }
+});
+
+/**
  * [DELETE] /discount/:id
  * Admin: ลบโค้ดส่วนลด
  */

@@ -33,7 +33,8 @@ app.use(
       "/user/register",
       "/testtoken",
       "/games/types",
-      "/uploads",               // ยกเว้น root uploads
+      "/uploads",               
+      // ยกเว้น root uploads
       { url: /^\/uploads\/.*/, methods: ["GET"] }, // ยกเว้นไฟล์ภายใน uploads
       { url: /^\/games(\/.*)?$/, methods: ["GET"] } // ยกเว้น GET /games and subpaths
     ],
