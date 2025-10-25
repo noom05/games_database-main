@@ -32,7 +32,8 @@ app.use(jwtauth_1.jwtAuthen.unless({
         "/user/register",
         "/testtoken",
         "/games/types",
-        "/uploads", // ยกเว้น root uploads
+        "/uploads",
+        // ยกเว้น root uploads
         { url: /^\/uploads\/.*/, methods: ["GET"] }, // ยกเว้นไฟล์ภายใน uploads
         { url: /^\/games(\/.*)?$/, methods: ["GET"] } // ยกเว้น GET /games and subpaths
     ],
@@ -48,6 +49,8 @@ app.use((err, _req, res, next) => {
 const index_1 = require("./controller/index");
 const user_1 = require("./controller/user");
 const games_1 = require("./controller/games");
+const discount_1 = require("./controller/discount");
 app.use("/", index_1.router);
 app.use("/user", user_1.router);
 app.use("/games", games_1.router);
+app.use('/discount', discount_1.router);
