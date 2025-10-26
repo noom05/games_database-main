@@ -6,19 +6,14 @@ import bcrypt from "bcrypt";
 import { fileUpload } from "../middleware/fileMiddleware";
 import { generateToken, secret } from "../auth/jwtauth";
 
-import cloudinary from "../cloudinary";
-import fs from "fs";
-
 export const router = express.Router();
 
-// --- User Management Routes ---
+/////-------------Users---------------//////
 
-// GET all users
+//get all user
 router.get("/", async (req, res) => {
   try {
-    const [rows] = await conn.query(
-      "SELECT uid, username, email, role, profile FROM users"
-    );
+    const [rows] = await conn.query("SELECT * FROM users");
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -26,54 +21,298 @@ router.get("/", async (req, res) => {
   }
 });
 
-// --- Wallet & Transaction Routes ---
+//get user by id
+router.get("/:id", async (req, res) => {
+  try {
+    const id = +req.params.id;
 
-// GET Wallet Balance
+    const [rows] = await conn.query("SELECT * FROM users WHERE uid = ?", [id]);
+    const users = rows as any[];
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const user = users[0];
+    res.json(user);
+  } catch (err) {
+    console.error("GET /user/:id error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//register
+router.post(
+  "/register",
+  fileUpload.diskLoader.single("file"), // multer middleware
+  async (req, res) => {
+    try {
+      const user: Users = req.body;
+      const profileFilename = req.file ? req.file.filename : null;
+      const hashedPassword = await bcrypt.hash(user.password, 10);
+
+      // เพิ่ม user ลง DB
+      const sql =
+        "INSERT INTO `users`(`username`,`email`,`password`,`profile`) VALUES (?,?,?,?)";
+      const formattedSql = mysql.format(sql, [
+        user.username,
+        user.email,
+        hashedPassword,
+        profileFilename,
+      ]);
+
+      const [result] = await conn.query(formattedSql);
+      const info = result as mysql.ResultSetHeader;
+
+      // สร้าง Wallet ให้ user ใหม่ (balance จะเป็น 0 ตาม DEFAULT)
+      await conn.query("INSERT INTO wallet (user_id) VALUES (?)", [
+        info.insertId,
+      ]);
+
+      // ส่ง response
+      res.status(201).json({
+        message: "สมัครสมาชิกสำเร็จ",
+        user: {
+          uid: info.insertId,
+          username: user.username,
+          email: user.email,
+          profile: profileFilename,
+          role: "user",
+          balance: 0, // จะมี wallet พร้อม balance 0 ทันที
+        },
+      });
+    } catch (err) {
+      console.error("POST /user/register error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+);
+
+//delete
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = +req.params.id;
+
+    // ดึงชื่อไฟล์จาก DB ก่อน
+    const [rows] = await conn.query(
+      "SELECT profile FROM `users` WHERE uid = ?",
+      [id]
+    );
+    const user = (rows as any[])[0];
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // ลบ record จาก DB
+    const [result] = await conn.query("DELETE FROM `users` WHERE uid = ?", [
+      id,
+    ]);
+    const info = result as mysql.ResultSetHeader;
+
+    // ลบไฟล์จริง โดยเรียก method จาก fileMiddleware
+    if (user.profile) {
+      fileUpload.deleteFile(user.profile);
+    }
+
+    res.status(200).json({ affected_row: info.affectedRows });
+  } catch (err) {
+    console.error("DELETE /user error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//edit
+router.put(
+  "/:id",
+  fileUpload.diskLoader.single("file"), // รองรับ upload รูปใหม่
+  async (req, res) => {
+    try {
+      const id = +req.params.id;
+      const user: Partial<Users> = req.body;
+
+      // ดึงข้อมูลผู้ใช้เดิม
+      const [rows] = await conn.query("SELECT * FROM users WHERE uid = ?", [
+        id,
+      ]);
+      const result = rows as Users[];
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const original = result[0];
+
+      // ถ้ามีไฟล์ใหม่ อัปเดตชื่อไฟล์ใหม่ และลบไฟล์เก่า
+      let profileFilename = original.profile;
+      if (req.file) {
+        // ลบไฟล์เก่าถ้ามี
+        if (original.profile) {
+          fileUpload.deleteFile(original.profile);
+        }
+        profileFilename = req.file.filename;
+      }
+
+      // ถ้ามีการเปลี่ยนรหัสผ่าน
+      let hashedPassword = original.password;
+      if (user.password) {
+        hashedPassword = await bcrypt.hash(user.password, 10);
+      }
+
+      // รวมข้อมูลเดิม + ใหม่
+      const update = {
+        ...original,
+        ...user,
+        password: hashedPassword,
+        profile: profileFilename,
+      };
+
+      // อัปเดต DB
+      const sql =
+        "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
+      const formattedSql = mysql.format(sql, [
+        update.username,
+        update.email,
+        update.password,
+        update.profile,
+        id,
+      ]);
+
+      const [updateResult] = await conn.query(formattedSql);
+      const info = updateResult as mysql.ResultSetHeader;
+
+      res.status(200).json({
+        affected_row: info.affectedRows,
+        new_profile: update.profile || null,
+      });
+    } catch (err) {
+      console.error("PUT /user/:id error:", err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+);
+
+//login
+router.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    // 1. ตรวจสอบผู้ใช้
+    const [rows] = await conn.query("SELECT * FROM users WHERE username = ?", [
+      username,
+    ]);
+    if ((rows as any[]).length === 0)
+      return res.status(401).json({ error: "ไม่พบชื่อผู้ใช้ในระบบ" });
+
+    const user = (rows as any[])[0];
+
+    // 2. ตรวจสอบรหัสผ่าน
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
+
+    // 3. สร้าง JWT payload
+    const payload = {
+      uid: user.uid,
+      username: user.username,
+      role: user.role, // สำคัญสำหรับแยกสิทธิ์
+    };
+
+    // 4. สร้าง token
+    const token = generateToken(payload, secret);
+
+    // 5. ส่ง response
+    res.json({
+      message: "เข้าสู่ระบบสำเร็จ",
+      token,
+      user: {
+        uid: user.uid,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+////-------User Management------/////
+
+//get wallet balance
 router.get("/wallet/:id", async (req, res) => {
-  const userId = req.params.id;
+  const userId = +req.params.id;
   const [rows] = await conn.query<RowDataPacket[]>(
     "SELECT balance FROM wallet WHERE user_id = ?",
     [userId]
   );
 
+  // ถ้าไม่มี wallet -> สร้างให้เลย พร้อม default balance = 0
   if (rows.length === 0) {
-    return res.status(404).json({ error: "Wallet not found" });
+    await conn.query("INSERT INTO wallet (user_id) VALUES (?)", [userId]); // balance จะเป็น 0 ตาม DEFAULT
+    return res.json({ balance: 0 });
   }
+
   res.json(rows[0]);
 });
 
-// POST Top-up Wallet
+// POST Top-up Wallet (ปลอดภัย + กัน race condition + validate amount)
 router.post("/wallet/topup", async (req, res) => {
   const { user_id, amount } = req.body;
+
+  // --- Validate Input ---
+  const parsedAmount = Number(amount);
+  if (!user_id || isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: "Invalid user_id or amount" });
+  }
+
   const connection = await conn.getConnection();
   try {
     await connection.beginTransaction();
+
+    // Lock wallet row เพื่อป้องกัน race condition
     const [rows] = await connection.query<RowDataPacket[]>(
       "SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE",
       [user_id]
     );
 
     if (rows.length === 0) {
+      // ถ้า wallet ยังไม่มี -> สร้างใหม่
       await connection.query(
         "INSERT INTO wallet (user_id, balance) VALUES (?, ?)",
-        [user_id, amount]
+        [user_id, parsedAmount]
       );
     } else {
+      // เพิ่มยอดเงิน
       await connection.query(
         "UPDATE wallet SET balance = balance + ? WHERE user_id = ?",
-        [amount, user_id]
+        [parsedAmount, user_id]
       );
     }
 
-    await connection.query(
+    // บันทึก transaction
+    await connection.query<ResultSetHeader>(
       "INSERT INTO transaction (user_id, type, amount) VALUES (?, 'topup', ?)",
-      [user_id, amount]
+      [user_id, parsedAmount]
     );
+
     await connection.commit();
-    res.json({ message: "Top-up successful" });
-  } catch (err) {
+
+    // ดึงยอดล่าสุดกลับไป
+    const [updatedRows] = await connection.query<RowDataPacket[]>(
+      "SELECT balance FROM wallet WHERE user_id = ?",
+      [user_id]
+    );
+
+    res.json({
+      message: "Top-up successful",
+      balance: updatedRows[0].balance,
+    });
+  } catch (err: any) {
     await connection.rollback();
-    res.status(500).json({ error: "Top-up failed", detail: err });
+    console.error("Top-up failed:", err);
+    res.status(500).json({ error: "Top-up failed", detail: err.message });
   } finally {
     connection.release();
   }
@@ -82,123 +321,147 @@ router.post("/wallet/topup", async (req, res) => {
 // POST Purchase Game (ฉบับอัปเดต รองรับส่วนลด)
 // POST /user/wallet/purchase
 router.post("/wallet/purchase", async (req, res) => {
-    // 1. รับ discount_code เพิ่มจาก body
-    const { user_id, game_id, discount_code } = req.body;
-    
-    if (!user_id || !game_id) {
-        return res.status(400).json({ error: "User ID and Game ID are required." });
+  // 1. รับ discount_code เพิ่มจาก body
+  const { user_id, game_id, discount_code } = req.body;
+
+  if (!user_id || !game_id) {
+    return res.status(400).json({ error: "User ID and Game ID are required." });
+  }
+
+  const connection = await conn.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // --- ตัวแปรสำหรับคำนวณราคา ---
+    let original_price = 0;
+    let final_price = 0;
+    let discountCodeData: RowDataPacket | null = null; // เก็บข้อมูลโค้ดที่ใช้
+
+    // 2. ดึงข้อมูลเกม (ล็อคแถว)
+    const [gameRows] = await connection.query<RowDataPacket[]>(
+      "SELECT id, game_name, price FROM games WHERE id = ? FOR UPDATE",
+      [game_id]
+    );
+    if (gameRows.length === 0) throw new Error("Game not found");
+
+    const game = gameRows[0];
+    original_price = game.price;
+    final_price = game.price; // ราคาเริ่มต้น = ราคาเต็ม
+
+    // 3. ดึงข้อมูลกระเป๋าเงิน (ล็อคแถว)
+    const [walletRows] = await connection.query<RowDataPacket[]>(
+      "SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE",
+      [user_id]
+    );
+    if (walletRows.length === 0) throw new Error("Wallet not found");
+
+    const wallet = walletRows[0];
+
+    // 4. เช็คว่าเคยซื้อเกมนี้หรือยัง
+    const [duplicateCheck] = await connection.query<RowDataPacket[]>(
+      "SELECT id FROM transaction WHERE user_id = ? AND game_id = ? AND type = 'purchase'",
+      [user_id, game_id]
+    );
+    if (duplicateCheck.length > 0) {
+      throw new Error("You already purchased this game");
     }
 
-    const connection = await conn.getConnection();
-    try {
-        await connection.beginTransaction();
+    // 5. [LOGIC ใหม่] ตรวจสอบและคำนวณส่วนลด (ถ้ามีโค้ดส่งมา)
+    if (discount_code) {
+      // 5.1 ค้นหาโค้ดและล็อคแถว (สำคัญมากที่ต้อง FOR UPDATE)
+      const [codeRows] = await connection.query<RowDataPacket[]>(
+        "SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE FOR UPDATE",
+        [discount_code.toUpperCase()]
+      );
+      if (codeRows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
 
-        // --- ตัวแปรสำหรับคำนวณราคา ---
-        let original_price = 0;
-        let final_price = 0;
-        let discountCodeData: RowDataPacket | null = null; // เก็บข้อมูลโค้ดที่ใช้
+      const code = codeRows[0];
+      discountCodeData = code; // เก็บข้อมูลโค้ดไว้ใช้ตอนจบ
 
-        // 2. ดึงข้อมูลเกม (ล็อคแถว)
-        const [gameRows] = await connection.query<RowDataPacket[]>("SELECT id, game_name, price FROM games WHERE id = ? FOR UPDATE", [game_id]);
-        if (gameRows.length === 0) throw new Error("Game not found");
-        
-        const game = gameRows[0];
-        original_price = game.price;
-        final_price = game.price; // ราคาเริ่มต้น = ราคาเต็ม
+      // 5.2 เช็คเงื่อนไขโค้ด (เหมือนใน /apply)
+      if (code.expiry_date && new Date(code.expiry_date) < new Date()) {
+        throw new Error("โค้ดส่วนลดนี้หมดอายุแล้ว");
+      }
+      if (code.current_uses >= code.max_uses) {
+        throw new Error("โค้ดส่วนลดนี้ถูกใช้เต็มจำนวนแล้ว");
+      }
 
-        // 3. ดึงข้อมูลกระเป๋าเงิน (ล็อคแถว)
-        const [walletRows] = await connection.query<RowDataPacket[]>("SELECT balance FROM wallet WHERE user_id = ? FOR UPDATE", [user_id]);
-        if (walletRows.length === 0) throw new Error("Wallet not found");
+      // 5.3 เช็คว่าเคยใช้หรือยัง
+      const [usageRows] = await connection.query<RowDataPacket[]>(
+        "SELECT id FROM user_discount_usage WHERE user_id = ? AND code_id = ?",
+        [user_id, code.id]
+      );
+      if (usageRows.length > 0) {
+        throw new Error("คุณใช้โค้ดส่วนลดนี้ไปแล้ว");
+      }
 
-        const wallet = walletRows[0];
+      // 5.4 คำนวณราคาสุดท้าย
+      if (code.discount_type === "percent") {
+        final_price =
+          original_price - original_price * (code.discount_value / 100);
+      } else if (code.discount_type === "fixed") {
+        final_price = original_price - code.discount_value;
+      }
 
-        // 4. เช็คว่าเคยซื้อเกมนี้หรือยัง
-        const [duplicateCheck] = await connection.query<RowDataPacket[]>("SELECT id FROM transaction WHERE user_id = ? AND game_id = ? AND type = 'purchase'", [user_id, game_id]);
-        if (duplicateCheck.length > 0) {
-            throw new Error("You already purchased this game");
-        }
-
-        // 5. [LOGIC ใหม่] ตรวจสอบและคำนวณส่วนลด (ถ้ามีโค้ดส่งมา)
-        if (discount_code) {
-            // 5.1 ค้นหาโค้ดและล็อคแถว (สำคัญมากที่ต้อง FOR UPDATE)
-            const [codeRows] = await connection.query<RowDataPacket[]>(
-                "SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE FOR UPDATE",
-                [discount_code.toUpperCase()]
-            );
-            if (codeRows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
-            
-            const code = codeRows[0];
-            discountCodeData = code; // เก็บข้อมูลโค้ดไว้ใช้ตอนจบ
-
-            // 5.2 เช็คเงื่อนไขโค้ด (เหมือนใน /apply)
-            if (code.expiry_date && new Date(code.expiry_date) < new Date()) {
-                throw new Error("โค้ดส่วนลดนี้หมดอายุแล้ว");
-            }
-            if (code.current_uses >= code.max_uses) {
-                throw new Error("โค้ดส่วนลดนี้ถูกใช้เต็มจำนวนแล้ว");
-            }
-
-            // 5.3 เช็คว่าเคยใช้หรือยัง
-            const [usageRows] = await connection.query<RowDataPacket[]>(
-                "SELECT id FROM user_discount_usage WHERE user_id = ? AND code_id = ?",
-                [user_id, code.id]
-            );
-            if (usageRows.length > 0) {
-                throw new Error("คุณใช้โค้ดส่วนลดนี้ไปแล้ว");
-            }
-
-            // 5.4 คำนวณราคาสุดท้าย
-            if (code.discount_type === 'percent') {
-                final_price = original_price - (original_price * (code.discount_value / 100));
-            } else if (code.discount_type === 'fixed') {
-                final_price = original_price - code.discount_value;
-            }
-
-            // ป้องกันราคาติดลบ
-            if (final_price < 0) {
-                final_price = 0;
-            }
-        }
-
-        // 6. [LOGIC แก้ไข] เช็คยอดเงินคงเหลือ เทียบกับ "ราคาสุดท้าย"
-        if (wallet.balance < final_price) {
-            throw new Error("Not enough balance");
-        }
-
-        // 7. [LOGIC แก้ไข] หักเงินออกจาก wallet ด้วย "ราคาสุดท้าย"
-        await connection.query("UPDATE wallet SET balance = balance - ? WHERE user_id = ?", [final_price, user_id]);
-        
-        // 8. [LOGIC แก้ไข] บันทึก transaction ด้วย "ราคาสุดท้าย"
-        await connection.query<ResultSetHeader>("INSERT INTO transaction (user_id, type, amount, game_id) VALUES (?, 'purchase', ?, ?)", [user_id, final_price, game_id]);
-        
-        // 9. [LOGIC ใหม่] อัปเดตตารางส่วนลด (ถ้ามีการใช้งาน)
-        if (discountCodeData) {
-            // 9.1 เพิ่มจำนวนการใช้
-            await connection.query("UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = ?", [discountCodeData.id]);
-            // 9.2 บันทึกว่า User นี้ใช้โค้ดนี้แล้ว
-            await connection.query("INSERT INTO user_discount_usage (user_id, code_id) VALUES (?, ?)", [user_id, discountCodeData.id]);
-        }
-        
-        // 10. ดึงยอดเงินล่าสุด
-        const [updatedWallet] = await connection.query<RowDataPacket[]>("SELECT balance FROM wallet WHERE user_id = ?", [user_id]);
-        
-        // 11. จบ Transaction
-        await connection.commit();
-
-        res.json({
-            message: "Purchase successful",
-            balance: updatedWallet[0].balance,
-        });
-
-    } catch (err: any) {
-        // หากเกิด Error ใดๆ (เช่น เงินไม่พอ, โค้ดผิด) ให้ Rollback ทั้งหมด
-        await connection.rollback();
-        console.error("Purchase failed:", err.message);
-        // ส่ง Error ที่เกิดขึ้นจริงกลับไปให้ Frontend
-        res.status(400).json({ error: err.message });
-    } finally {
-        connection.release();
+      // ป้องกันราคาติดลบ
+      if (final_price < 0) {
+        final_price = 0;
+      }
     }
+
+    // 6. [LOGIC แก้ไข] เช็คยอดเงินคงเหลือ เทียบกับ "ราคาสุดท้าย"
+    if (wallet.balance < final_price) {
+      throw new Error("Not enough balance");
+    }
+
+    // 7. [LOGIC แก้ไข] หักเงินออกจาก wallet ด้วย "ราคาสุดท้าย"
+    await connection.query(
+      "UPDATE wallet SET balance = balance - ? WHERE user_id = ?",
+      [final_price, user_id]
+    );
+
+    // 8. [LOGIC แก้ไข] บันทึก transaction ด้วย "ราคาสุดท้าย"
+    await connection.query<ResultSetHeader>(
+      "INSERT INTO transaction (user_id, type, amount, game_id) VALUES (?, 'purchase', ?, ?)",
+      [user_id, final_price, game_id]
+    );
+
+    // 9. [LOGIC ใหม่] อัปเดตตารางส่วนลด (ถ้ามีการใช้งาน)
+    if (discountCodeData) {
+      // 9.1 เพิ่มจำนวนการใช้
+      await connection.query(
+        "UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = ?",
+        [discountCodeData.id]
+      );
+      // 9.2 บันทึกว่า User นี้ใช้โค้ดนี้แล้ว
+      await connection.query(
+        "INSERT INTO user_discount_usage (user_id, code_id) VALUES (?, ?)",
+        [user_id, discountCodeData.id]
+      );
+    }
+
+    // 10. ดึงยอดเงินล่าสุด
+    const [updatedWallet] = await connection.query<RowDataPacket[]>(
+      "SELECT balance FROM wallet WHERE user_id = ?",
+      [user_id]
+    );
+
+    // 11. จบ Transaction
+    await connection.commit();
+
+    res.json({
+      message: "Purchase successful",
+      balance: updatedWallet[0].balance,
+    });
+  } catch (err: any) {
+    // หากเกิด Error ใดๆ (เช่น เงินไม่พอ, โค้ดผิด) ให้ Rollback ทั้งหมด
+    await connection.rollback();
+    console.error("Purchase failed:", err.message);
+    // ส่ง Error ที่เกิดขึ้นจริงกลับไปให้ Frontend
+    res.status(400).json({ error: err.message });
+  } finally {
+    connection.release();
+  }
 });
 
 //get game purchase by user_id and game_id
@@ -213,12 +476,12 @@ router.get("/game/:gameId/detail", async (req, res) => {
   try {
     // ดึงข้อมูลเกม
     const [gameRows] = await conn.query<RowDataPacket[]>(
-      'SELECT * FROM games WHERE id = ?',
+      "SELECT * FROM games WHERE id = ?",
       [gameId]
     );
 
     if (gameRows.length === 0) {
-      return res.status(404).json({ error: 'Game not found' });
+      return res.status(404).json({ error: "Game not found" });
     }
 
     // ตรวจสอบว่าผู้ใช้ซื้อเกมนี้แล้วหรือยัง
@@ -233,9 +496,8 @@ router.get("/game/:gameId/detail", async (req, res) => {
     // ส่งข้อมูลทั้งหมด
     res.json({
       game: gameRows[0],
-      isPurchased
+      isPurchased,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -268,158 +530,236 @@ router.get("/admin/history", async (req, res) => {
   res.json(rows);
 });
 
-// GET user by id
-router.get("/:id", async (req, res) => {
+// get game library
+router.get("/library/:userId", async (req, res) => {
+  const userId = +req.params.userId;
+
   try {
-    const id = req.params.id;
     const [rows] = await conn.query(
-      "SELECT uid, username, email, role, profile FROM users WHERE uid = ?",
-      [id]
+      `
+      SELECT 
+        g.id,
+        g.game_name,
+        g.image,
+        g.price,
+        g.description,
+        g.release_date
+      FROM transaction t
+      JOIN games g ON t.game_id = g.id
+      WHERE t.user_id = ? AND t.type = 'purchase'
+      GROUP BY g.id
+      `,
+      [userId]
     );
-    const users = rows as any[];
-    if (users.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.json(users[0]);
+
+    res.json(rows);
   } catch (err) {
-    console.error("GET /user/:id error:", err);
+    console.error("GET /library error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// POST (Register) a new user
-router.post(
-  "/register",
-  fileUpload.diskLoader.single("file"),
-  async (req, res) => {
-    try {
-      const user: Users = req.body;
-      const profileFilename = req.file ? req.file.filename : null;
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+//เพิ่มใหม่
+// เพิ่มเกมลงรถเข็น
+router.post("/cart/add", async (req, res) => {
+  const { user_id, game_id } = req.body;
 
-      const sql =
-        "INSERT INTO `users`(`username`,`email`,`password`,`profile`, `role`) VALUES (?,?,?,?,'user')";
-      const [result] = await conn.query(sql, [
-        user.username,
-        user.email,
-        hashedPassword,
-        profileFilename,
-      ]);
-      const info = result as mysql.ResultSetHeader;
+  if (!user_id || !game_id)
+    return res.status(400).json({ error: "Missing user_id or game_id" });
 
-      res.status(201).json({
-        message: "สมัครสมาชิกสำเร็จ",
-        user: {
-          uid: info.insertId,
-          username: user.username,
-          email: user.email,
-          profile: profileFilename,
-          role: "user",
-        },
-      });
-    } catch (err) {
-      console.error("POST /user/register error:", err);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  }
-);
-
-// POST (Login)
-router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
   try {
-    const [rows] = await conn.query("SELECT * FROM users WHERE username = ?", [
-      username,
+    // ตรวจสอบว่าเกมนี้อยู่ในรถเข็นแล้วหรือยัง
+    const [exists] = await conn.query<RowDataPacket[]>(
+      "SELECT * FROM cart WHERE user_id = ? AND game_id = ?",
+      [user_id, game_id]
+    );
+
+    if (exists.length > 0) {
+      return res.status(400).json({ message: "เกมนี้อยู่ในรถเข็นแล้ว" });
+    }
+
+    await conn.query("INSERT INTO cart (user_id, game_id) VALUES (?, ?)", [
+      user_id,
+      game_id,
     ]);
-    if ((rows as any[]).length === 0)
-      return res.status(401).json({ error: "ไม่พบชื่อผู้ใช้ในระบบ" });
+    res.json({ message: "เพิ่มเกมลงรถเข็นแล้ว" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-    const user = (rows as any[])[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
+// ดึงรายการในรถเข็นของผู้ใช้
+router.get("/cart/:userId", async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const [rows] = await conn.query(
+      `
+      SELECT g.id, g.game_name, g.price, g.image
+      FROM cart c
+      JOIN games g ON c.game_id = g.id
+      WHERE c.user_id = ?
+      `,
+      [userId]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-    const payload = { uid: user.uid, username: user.username, role: user.role };
-    const token = generateToken(payload, secret);
+// ลบเกมออกจากรถเข็น
+router.delete("/cart/remove", async (req, res) => {
+  const { user_id, game_id } = req.body;
+  try {
+    await conn.query("DELETE FROM cart WHERE user_id = ? AND game_id = ?", [
+      user_id,
+      game_id,
+    ]);
+    res.json({ message: "ลบเกมออกจากรถเข็นแล้ว" });
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
-    res.json({
-      message: "เข้าสู่ระบบสำเร็จ",
-      token,
-      user: {
-        uid: user.uid,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-      },
+//กดซื้อเกมทั้งหมดในที่เดียว
+router.post("/cart/checkout", async (req, res) => {
+  const { user_id, discount_code } = req.body;
+  const connection = await conn.getConnection();
+
+  try {
+    // ดึงเกมในรถเข็นพร้อมราคาจริง
+    const [cartItems] = await connection.query<RowDataPacket[]>(
+      `SELECT c.game_id, g.price
+       FROM cart c
+       JOIN games g ON c.game_id = g.id
+       WHERE c.user_id = ?`,
+      [user_id]
+    );
+
+    if (cartItems.length === 0)
+      return res.status(400).json({ message: "รถเข็นของคุณว่างเปล่า" });
+
+    await connection.beginTransaction();
+
+    // ตรวจสอบ Wallet
+    const [wallet] = await connection.query<RowDataPacket[]>(
+      "SELECT balance FROM wallet WHERE user_id = ?",
+      [user_id]
+    );
+    const balance = wallet[0]?.balance || 0;
+
+    // ตรวจสอบส่วนลด
+    let discountValue = 0;
+    let discountType: "percent" | "fixed" | null = null;
+    let discountCodeId: number | null = null;
+
+    if (discount_code) {
+      const [codeRows] = await connection.query<RowDataPacket[]>(
+        "SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE",
+        [discount_code.toUpperCase()]
+      );
+      if (codeRows.length > 0) {
+        const discount = codeRows[0];
+        discountCodeId = discount.id;
+        discountType = discount.discount_type;
+        discountValue = discount.discount_value;
+
+        // เช็คหมดอายุและจำนวนใช้แล้ว
+        if (discount.expiry_date && new Date(discount.expiry_date) < new Date())
+          throw new Error("โค้ดส่วนลดหมดอายุ");
+        if (discount.current_uses >= discount.max_uses)
+          throw new Error("โค้ดส่วนลดถูกใช้เต็มจำนวนแล้ว");
+      }
+    }
+
+    // คำนวณ total price
+    let totalPrice = cartItems.reduce((sum, item) => sum + item.price, 0);
+
+    // ใช้ส่วนลด
+    if (discountType === "percent") {
+      totalPrice = totalPrice * (1 - discountValue / 100);
+    } else if (discountType === "fixed") {
+      totalPrice = totalPrice - discountValue;
+    }
+    if (totalPrice < 0) totalPrice = 0;
+
+    if (balance < totalPrice) {
+      await connection.rollback();
+      return res.status(400).json({ message: "ยอดเงินไม่เพียงพอ" });
+    }
+
+    // ลดเงินใน Wallet
+    await connection.query(
+      "UPDATE wallet SET balance = balance - ? WHERE user_id = ?",
+      [totalPrice, user_id]
+    );
+
+    // สร้าง finalPrices สำหรับบันทึก transaction
+    const finalPrices = cartItems.map((item) => {
+      let price = item.price;
+      if (discountType === "percent") price = price * (1 - discountValue / 100);
+      // fixed discount แบ่งตามสัดส่วนของเกมแต่ละตัว
+      else if (discountType === "fixed") {
+        const proportion = item.price / cartItems.reduce((sum, i) => sum + i.price, 0);
+        price = item.price - discountValue * proportion;
+      }
+      if (price < 0) price = 0;
+      return { game_id: item.game_id, finalPrice: price };
     });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+
+    // เพิ่ม Transaction และอัปเดต total_sales
+    for (const item of finalPrices) {
+      await connection.query<ResultSetHeader>(
+        "INSERT INTO transaction (user_id, game_id, amount, type, discount_code_id) VALUES (?, ?, ?, 'purchase', ?)",
+        [user_id, item.game_id, item.finalPrice, discountCodeId]
+      );
+
+      await connection.query(
+        "UPDATE games SET total_sales = total_sales + 1 WHERE id = ?",
+        [item.game_id]
+      );
+    }
+
+    // เพิ่มการใช้โค้ดส่วนลด (ถ้ามี) แต่เช็ก duplicate ก่อน
+    if (discountCodeId) {
+      const [usageRows] = await connection.query<RowDataPacket[]>(
+        "SELECT id FROM user_discount_usage WHERE user_id = ? AND code_id = ?",
+        [user_id, discountCodeId]
+      );
+
+      if (usageRows.length === 0) {
+        await connection.query(
+          "INSERT INTO user_discount_usage (user_id, code_id) VALUES (?, ?)",
+          [user_id, discountCodeId]
+        );
+        await connection.query(
+          "UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = ?",
+          [discountCodeId]
+        );
+      }
+    }
+
+    // ลบเกมในรถเข็น
+    await connection.query("DELETE FROM cart WHERE user_id = ?", [user_id]);
+
+    await connection.commit();
+    res.json({ message: "ซื้อเกมทั้งหมดเรียบร้อยแล้ว!" });
+  } catch (err: any) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
+  } finally {
+    connection.release();
   }
 });
 
-// PUT (Edit) a user
-router.put("/:id", fileUpload.diskLoader.single("file"), async (req, res) => {
-  try {
-    const id = req.params.id;
-    const userUpdate: Partial<Users> = req.body;
-
-    const [rows] = await conn.query("SELECT * FROM users WHERE uid = ?", [id]);
-    const originalUser = (rows as any[])[0];
-    if (!originalUser) return res.status(404).json({ message: "User not found" });
-
-    let profileUrl = originalUser.profile;
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "gamestore/profile"
-      });
-      profileUrl = result.secure_url;
-      fs.unlinkSync(req.file.path);
-    }
-
-    let hashedPassword = originalUser.password;
-    if (userUpdate.password) {
-      hashedPassword = await bcrypt.hash(userUpdate.password, 10);
-    }
-
-    const sql = "UPDATE users SET username=?, email=?, password=?, profile=? WHERE uid=?";
-    await conn.query(sql, [
-      userUpdate.username || originalUser.username,
-      userUpdate.email || originalUser.email,
-      hashedPassword,
-      profileUrl,
-      id,
-    ]);
-
-    res.status(200).json({ message: "User updated successfully" });
-  } catch (err) {
-    console.error("PUT /user/:id error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-
-// DELETE a user
-router.delete("/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const [rows] = await conn.query(
-      "SELECT profile FROM `users` WHERE uid = ?",
-      [id]
-    );
-    const user = (rows as any[])[0];
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    await conn.query("DELETE FROM `users` WHERE uid = ?", [id]);
-    if (user.profile) {
-      fileUpload.deleteFile(user.profile);
-    }
-    res.status(200).json({ message: "User deleted successfully" });
-  } catch (err) {
-    console.error("DELETE /user error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+//เช็คเกมในรถเข็น
+router.get("/cart/has/:userId/:gameId", async (req, res) => {
+  const { userId, gameId } = req.params;
+  const [rows] = await conn.query<RowDataPacket[]>(
+    "SELECT id FROM cart WHERE user_id = ? AND game_id = ? LIMIT 1",
+    [userId, gameId]
+  );
+  res.json({ inCart: rows.length > 0 });
 });
