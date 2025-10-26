@@ -1,15 +1,18 @@
 import express from "express";
 import { conn } from "../db/dbconnect";
 import { Users } from "../model/user";
-import mysql from "mysql2";
+import mysql, { RowDataPacket } from "mysql2";
 import bcrypt from "bcrypt";
 import { fileUpload } from "../middleware/fileMiddleware";
 
 export const router = express.Router();
 
-// get all games with their categories
+// get all games with categories + purchase status
 router.get("/", async (req, res) => {
   try {
+    const userId = req.query.userId ? Number(req.query.userId) : null;
+
+    // ✅ ดึงข้อมูลเกมทั้งหมด
     const [rows] = await conn.query(`
       SELECT 
         g.id,
@@ -25,7 +28,30 @@ router.get("/", async (req, res) => {
       LEFT JOIN types t ON gt.type_id = t.id
       GROUP BY g.id
     `);
-    res.json(rows);
+
+    let games = rows as any[];
+
+    // ✅ ถ้ามี userId ให้เช็กว่าเกมไหนเคยซื้อแล้ว
+    if (userId) {
+      const [purchasedRows] = await conn.query<RowDataPacket[]>(
+        "SELECT game_id FROM transaction WHERE user_id = ? AND type = 'purchase'",
+        [userId]
+      );
+      const purchasedIds = new Set(
+        (purchasedRows as any[]).map((p) => p.game_id)
+      );
+
+      // ✅ เพิ่มฟิลด์ isPurchased ให้แต่ละเกม
+      games = games.map((g) => ({
+        ...g,
+        isPurchased: purchasedIds.has(g.id),
+      }));
+    } else {
+      // ถ้าไม่มี userId ก็ set false ทั้งหมด
+      games = games.map((g) => ({ ...g, isPurchased: false }));
+    }
+
+    res.json(games);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Cannot read games data" });
