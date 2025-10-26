@@ -9,9 +9,11 @@ const dbconnect_1 = require("../db/dbconnect");
 const mysql2_1 = __importDefault(require("mysql2"));
 const fileMiddleware_1 = require("../middleware/fileMiddleware");
 exports.router = express_1.default.Router();
-// get all games with their categories
+// get all games with categories + purchase status
 exports.router.get("/", async (req, res) => {
     try {
+        const userId = req.query.userId ? Number(req.query.userId) : null;
+        // ✅ ดึงข้อมูลเกมทั้งหมด
         const [rows] = await dbconnect_1.conn.query(`
       SELECT 
         g.id,
@@ -27,7 +29,22 @@ exports.router.get("/", async (req, res) => {
       LEFT JOIN types t ON gt.type_id = t.id
       GROUP BY g.id
     `);
-        res.json(rows);
+        let games = rows;
+        // ✅ ถ้ามี userId ให้เช็กว่าเกมไหนเคยซื้อแล้ว
+        if (userId) {
+            const [purchasedRows] = await dbconnect_1.conn.query("SELECT game_id FROM transaction WHERE user_id = ? AND type = 'purchase'", [userId]);
+            const purchasedIds = new Set(purchasedRows.map((p) => p.game_id));
+            // ✅ เพิ่มฟิลด์ isPurchased ให้แต่ละเกม
+            games = games.map((g) => ({
+                ...g,
+                isPurchased: purchasedIds.has(g.id),
+            }));
+        }
+        else {
+            // ถ้าไม่มี userId ก็ set false ทั้งหมด
+            games = games.map((g) => ({ ...g, isPurchased: false }));
+        }
+        res.json(games);
     }
     catch (err) {
         console.error(err);
