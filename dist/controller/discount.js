@@ -8,14 +8,10 @@ const express_1 = __importDefault(require("express"));
 const dbconnect_1 = require("../db/dbconnect");
 // import { authMiddleware, adminMiddleware } from "../middleware/auth"; // (อนาคต) ควรเพิ่ม middleware ตรวจสอบสิทธิ์
 exports.router = express_1.default.Router();
-// =================================================================
-// ==                      ADMIN ROUTES (ข้อ 5.1, 5.2)           ==
-// =================================================================
 /**
  * [POST] /discount/
  * Admin: สร้างโค้ดส่วนลดใหม่
  */
-// (ในอนาคต ควรใส่ adminMiddleware มาคั่น)
 exports.router.post("/", async (req, res) => {
     const { code, discount_type, discount_value, max_uses, expiry_date } = req.body;
     // ตรวจสอบข้อมูลพื้นฐาน
@@ -46,7 +42,6 @@ exports.router.post("/", async (req, res) => {
  * [GET] /discount/
  * Admin: ดึงโค้ดส่วนลดทั้งหมด
  */
-// (ในอนาคต ควรใส่ adminMiddleware มาคั่น)
 exports.router.get("/", async (req, res) => {
     try {
         const [rows] = await dbconnect_1.conn.query("SELECT * FROM discount_codes ORDER BY created_at DESC");
@@ -61,7 +56,6 @@ exports.router.get("/", async (req, res) => {
  * [GET] /discount/:id
  * Admin: ดึงข้อมูลโค้ด 1 ตัวเพื่อนำไปแก้ไข
  */
-// (ควรใส่ adminMiddleware)
 exports.router.get("/:id", async (req, res) => {
     const { id } = req.params;
     try {
@@ -80,7 +74,6 @@ exports.router.get("/:id", async (req, res) => {
  * [PUT] /discount/:id
  * Admin: อัปเดตข้อมูลโค้ดส่วนลด
  */
-// (ควรใส่ adminMiddleware)
 exports.router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const { discount_type, discount_value, max_uses, expiry_date, is_active } = req.body;
@@ -115,7 +108,6 @@ exports.router.put("/:id", async (req, res) => {
  * [DELETE] /discount/:id
  * Admin: ลบโค้ดส่วนลด
  */
-// (ในอนาคต ควรใส่ adminMiddleware มาคั่น)
 exports.router.delete("/:id", async (req, res) => {
     const { id } = req.params;
     try {
@@ -132,41 +124,30 @@ exports.router.delete("/:id", async (req, res) => {
         res.status(500).json({ error: "Failed to delete code", detail: err });
     }
 });
-// =================================================================
-// ==                      USER ROUTES (ข้อ 5.3, 5.4)             ==
-// =================================================================
 /**
  * [POST] /discount/apply
  * User: ตรวจสอบโค้ดส่วนลด (ตอนกด "Apply" ในตะกร้า)
  */
-// (ในอนาคต ควรใส่ authMiddleware เพื่อดึง user_id จาก token)
+// แก้ใหม่
 exports.router.post("/apply", async (req, res) => {
-    // หมายเหตุ: user_id ควรสลับไปดึงจาก token (req.user.uid) แทนที่จะรับจาก body เพื่อความปลอดภัย
     const { code, user_id } = req.body;
-    if (!code || !user_id) {
+    if (!code || !user_id)
         return res.status(400).json({ error: "Code and User ID are required." });
-    }
     try {
-        // 1. หาโค้ด
         const [codeRows] = await dbconnect_1.conn.query("SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE", [code.toUpperCase()]);
-        if (codeRows.length === 0) {
+        if (codeRows.length === 0)
             return res.status(404).json({ error: "โค้ดส่วนลดไม่ถูกต้อง" });
-        }
         const discountCode = codeRows[0];
-        // 2. เช็คว่าโค้ดหมดอายุหรือยัง
-        if (discountCode.expiry_date && new Date(discountCode.expiry_date) < new Date()) {
+        if (discountCode.expiry_date && new Date(discountCode.expiry_date) < new Date())
             return res.status(400).json({ error: "โค้ดส่วนลดนี้หมดอายุแล้ว" });
-        }
-        // 3. เช็คว่าโค้ดถูกใช้เต็มจำนวนหรือยัง (ข้อ 5.2)
-        if (discountCode.current_uses >= discountCode.max_uses) {
+        if (discountCode.current_uses >= discountCode.max_uses)
             return res.status(400).json({ error: "โค้ดส่วนลดนี้ถูกใช้เต็มจำนวนแล้ว" });
-        }
-        // 4. เช็คว่า User นี้เคยใช้โค้ดนี้หรือยัง (ข้อ 5.3)
         const [usageRows] = await dbconnect_1.conn.query("SELECT id FROM user_discount_usage WHERE user_id = ? AND code_id = ?", [user_id, discountCode.id]);
-        if (usageRows.length > 0) {
+        if (usageRows.length > 0)
             return res.status(400).json({ error: "คุณใช้โค้ดส่วนลดนี้ไปแล้ว" });
-        }
-        // ถ้าผ่านทุกเงื่อนไข = ใช้งานได้
+        // บันทึกการใช้รหัส
+        await dbconnect_1.conn.query("INSERT INTO user_discount_usage (user_id, code_id) VALUES (?, ?)", [user_id, discountCode.id]);
+        await dbconnect_1.conn.query("UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = ?", [discountCode.id]);
         res.json({
             message: "ใช้โค้ดส่วนลดสำเร็จ",
             code: discountCode.code,
@@ -179,3 +160,40 @@ exports.router.post("/apply", async (req, res) => {
         res.status(500).json({ error: "Failed to apply code", detail: err });
     }
 });
+//test
+/**
+ * [GET] /discount/validate/:code
+ * ตรวจสอบโค้ดส่วนลดแบบทั่วไป (ไม่ผูกกับ user)
+ */
+// router.get("/validate/:code", async (req, res) => {
+//   const { code } = req.params;
+//   if (!code) {
+//     return res.status(400).json({ error: "ต้องระบุโค้ดส่วนลด" });
+//   }
+//   try {
+//     const [rows] = await conn.query<RowDataPacket[]>(
+//       "SELECT * FROM discount_codes WHERE code = ? AND is_active = TRUE",
+//       [code.toUpperCase()]
+//     );
+//     if (rows.length === 0) {
+//       return res.status(404).json({ valid: false, message: "โค้ดไม่ถูกต้อง" });
+//     }
+//     const discount = rows[0];
+//     if (discount.expiry_date && new Date(discount.expiry_date) < new Date()) {
+//       return res.status(400).json({ valid: false, message: "โค้ดหมดอายุแล้ว" });
+//     }
+//     if (discount.current_uses >= discount.max_uses) {
+//       return res.status(400).json({ valid: false, message: "โค้ดถูกใช้เต็มจำนวนแล้ว" });
+//     }
+//     res.json({
+//       valid: true,
+//       code: discount.code,
+//       discount_type: discount.discount_type,
+//       discount_value: discount.discount_value,
+//       message: "โค้ดสามารถใช้งานได้"
+//     });
+//   } catch (err) {
+//     console.error("Validate code error:", err);
+//     res.status(500).json({ error: "ตรวจสอบโค้ดไม่สำเร็จ" });
+//   }
+// });

@@ -114,19 +114,17 @@ exports.router.get("/type/:typeId", async (req, res) => {
     }
 });
 // add new game
-exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), async (req, res) => {
+exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), // multer middleware สำหรับรูปเกม
+async (req, res) => {
     try {
-        const { game_name, price, description } = req.body;
+        const { game_name, price, description, type_ids } = req.body;
         const imageFilename = req.file ? req.file.filename : null;
-        let type_ids = [];
-        try {
-            type_ids = req.body.type_ids ? JSON.parse(req.body.type_ids) : [];
-        }
-        catch (e) {
-            console.warn("⚠️ ไม่สามารถแปลง type_ids ได้:", req.body.type_ids);
-        }
         const now = new Date();
-        const currentDate = `${now.getFullYear()}-${("0" + (now.getMonth() + 1)).slice(-2)}-${("0" + now.getDate()).slice(-2)}`;
+        const year = now.getFullYear();
+        const month = ('0' + (now.getMonth() + 1)).slice(-2);
+        const day = ('0' + now.getDate()).slice(-2);
+        const currentDate = `${year}-${month}-${day}`;
+        // 1️⃣ เพิ่มเกมลงตาราง games
         const sqlGame = `
         INSERT INTO games (game_name, price, image, description, release_date, total_sales)
         VALUES (?, ?, ?, ?, ?, 0)
@@ -140,11 +138,13 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
         ]);
         const [result] = await dbconnect_1.conn.query(formattedSqlGame);
         const gameId = result.insertId;
-        if (Array.isArray(type_ids) && type_ids.length > 0) {
+        // 2️⃣ เพิ่มประเภทเกมลง game_type
+        if (type_ids && Array.isArray(type_ids)) {
             const values = type_ids.map((typeId) => [gameId, typeId]);
             const sqlTypes = "INSERT INTO game_type (game_id, type_id) VALUES ?";
             await dbconnect_1.conn.query(sqlTypes, [values]);
         }
+        // 3️⃣ ส่ง response
         res.status(201).json({
             message: "เพิ่มเกมสำเร็จ",
             game: {
@@ -153,13 +153,12 @@ exports.router.post("/", fileMiddleware_1.fileUpload.diskLoader.single("file"), 
                 price,
                 description,
                 image: imageFilename,
-                type_ids
             },
         });
     }
     catch (err) {
-        console.error("❌ POST /games error:", err);
-        res.status(500).json({ error: "เพิ่มเกมไม่สำเร็จ", detail: err.message || err });
+        console.error("POST /games error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 // delete game by id
@@ -253,6 +252,110 @@ async (req, res) => {
     }
     catch (err) {
         console.error("PUT /games/:id error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+// 🔍 Search games by keyword (name or description)
+exports.router.get("/search/:keyword", async (req, res) => {
+    try {
+        const keyword = req.params.keyword;
+        // ใช้ LIKE เพื่อค้นหาในชื่อหรือคำอธิบาย
+        const [rows] = await dbconnect_1.conn.query(`
+      SELECT 
+        g.id,
+        g.game_name,
+        g.price,
+        g.image,
+        g.description,
+        g.release_date,
+        g.total_sales,
+        GROUP_CONCAT(t.type_name SEPARATOR ', ') AS categories
+      FROM games g
+      LEFT JOIN game_type gt ON g.id = gt.game_id
+      LEFT JOIN types t ON gt.type_id = t.id
+      WHERE g.game_name LIKE ? OR g.description LIKE ?
+      GROUP BY g.id
+      `, [`%${keyword}%`, `%${keyword}%`]);
+        res.json(rows);
+    }
+    catch (err) {
+        console.error("GET /games/search/:keyword error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+// POST /games/multiple-types
+exports.router.post('/multiple-types', async (req, res) => {
+    try {
+        const { typeIds } = req.body; // [1,2,3]
+        if (!typeIds || !Array.isArray(typeIds) || typeIds.length === 0) {
+            return res.status(400).json({ error: "No typeIds provided" });
+        }
+        const placeholders = typeIds.map(() => '?').join(',');
+        const [rows] = await dbconnect_1.conn.query(`
+      SELECT g.id, g.game_name, g.price, g.image, g.description,
+             g.release_date, g.total_sales, GROUP_CONCAT(t.type_name SEPARATOR ', ') AS categories
+      FROM games g
+      JOIN game_type gt ON g.id = gt.game_id
+      JOIN types t ON gt.type_id = t.id
+      WHERE t.id IN (${placeholders})
+      GROUP BY g.id
+    `, typeIds);
+        res.json(rows);
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+// GET /games/:id/detail-with-rank
+//แก้ใหม่
+exports.router.get("/:id/detail-with-rank", async (req, res) => {
+    try {
+        const gameId = Number(req.params.id);
+        if (isNaN(gameId))
+            return res.status(400).json({ error: "Invalid game ID" });
+        const connection = await dbconnect_1.conn.getConnection();
+        // 1️⃣ ดึงเกมที่ต้องการ
+        const [gameRows] = await connection.query(`
+      SELECT g.id, g.game_name, g.price, g.image, g.description,
+             g.release_date, g.total_sales,
+             GROUP_CONCAT(t.type_name SEPARATOR ', ') AS categories
+      FROM games g
+      LEFT JOIN game_type gt ON g.id = gt.game_id
+      LEFT JOIN types t ON gt.type_id = t.id
+      WHERE g.id = ?
+      GROUP BY g.id
+      `, [gameId]);
+        if (gameRows.length === 0) {
+            connection.release();
+            return res.status(404).json({ error: "Game not found" });
+        }
+        const game = gameRows[0];
+        // 2️⃣ ดึง total_sales ทั้งหมดเรียงลดหลั่น
+        const [allGames] = await connection.query("SELECT id, total_sales FROM games ORDER BY total_sales DESC, id ASC");
+        // 3️⃣ คำนวณ dense rank
+        let rank = 1;
+        let prevSales = null;
+        let currentRank = 1;
+        for (let g of allGames) {
+            if (prevSales !== null && g.total_sales < prevSales) {
+                currentRank++;
+            }
+            if (g.id === gameId) {
+                rank = currentRank;
+                break;
+            }
+            prevSales = g.total_sales;
+        }
+        connection.release();
+        // 4️⃣ ส่ง response
+        res.json({
+            game,
+            rank
+        });
+    }
+    catch (err) {
+        console.error("GET /games/:id/detail-with-rank error:", err);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
